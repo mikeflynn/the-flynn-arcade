@@ -162,6 +162,83 @@ console warning.
 - Maps missing a player start or goal: a default start at the far left / goal
   at the far right is added, with a warning.
 
+## Sound & Music
+
+The audio *system* is built now. The audio *files* are added later. **Any
+missing sound or music file is skipped silently**: no errors, no crash, and
+the game plays normally without it.
+
+### Sound effects
+
+| Key | When it plays |
+|---|---|
+| `jump` | A hero jumps |
+| `land` | A hero lands (soft, optional) |
+| `donut` | A donut is collected |
+| `burger` | A burger is collected (heart restored) |
+| `hurt` | A hero touches a hazard |
+| `fall` | A hero falls into a pit |
+| `respawn` | A co-op brother pops back in |
+| `levelRestart` | Both heroes / the solo hero ran out of hearts |
+| `goal` | A hero reaches the destination |
+| `menuMove` / `menuSelect` | Title and pause menu navigation |
+| `pause` | Pause toggled |
+| `bark` | A dog starts chasing (level 4 chasers; optional flavor) |
+
+### Music
+
+| Key | Where |
+|---|---|
+| `title` | Title screen (loops) |
+| `level1` … `level4` | Each level (loops). A level file can name a different track via `music: "<key>"` |
+| `levelComplete` | "You made it!" card (plays once) |
+| `ending` | "Home sweet home!" screen |
+
+Music crossfades (~500 ms) between scenes.
+
+### Files and the kid-editable list
+- `src/sounds.ts` 🛠️ maps each key to a file name and its own volume:
+  ```ts
+  // Want your own jump sound? Record it, save it as jump.mp3 in
+  // public/assets/sounds/, and you're done!
+  export const sounds = {
+    jump:  { file: "jump",  volume: 0.6 },
+    donut: { file: "donut", volume: 0.5 },
+    // …
+  };
+  export const music = {
+    title:  { file: "title",  volume: 0.5 },
+    level1: { file: "level1", volume: 0.5 },
+    // …
+  };
+  ```
+- Sound effects live in `public/assets/sounds/`, music in `public/assets/music/`.
+- Each key is requested as `<file>.ogg` and `<file>.mp3`. Phaser picks the
+  format the browser supports, so either is fine.
+- A file that fails to load (404, bad format) is recorded as missing. Calls to
+  play it become no-ops, and a single friendly `console.info` lists the missing
+  files once per session ("No sound for: jump, donut. Add files to
+  public/assets/sounds/ to hear them!"). It's never an error or a crash.
+
+### Volume & controls
+- `settings.ts`: `musicVolume` and `sfxVolume` (0–1, clamped).
+- **M** key (or gamepad Select/Back) toggles mute. The pause menu has a mute
+  option. Mute state is saved in `localStorage` (wrapped in try/catch).
+- Browser autoplay rules: audio unlocks on the first key/button/click (the
+  title screen's "press start"), so nothing tries to play before that.
+
+### Implementation
+- `src/engine/audio.ts`: a small wrapper (`playSfx(key)`, `playMusic(key)`,
+  `stopMusic()`, `toggleMute()`) over Phaser's sound manager. It tracks loaded
+  vs. missing keys and never throws.
+- It stays inside the game for now. Per `CLAUDE.md` §6, it gets promoted to
+  `lib/audio` when a second game needs it.
+
+### README
+"Make It Your Own" gains a **"Make your own sounds"** step: record a sound on
+a phone or computer, export it as `.mp3`, name it after a key in `sounds.ts`,
+and drop it into `public/assets/sounds/`.
+
 ## Code Structure
 
 ```
@@ -169,11 +246,14 @@ super-flynn-bros/
 ├── README.md
 ├── package.json, tsconfig.json, vite.config.ts, index.html, Dockerfile
 ├── public/assets/                 # optional PNG overrides
+│   ├── sounds/                    # sound effects (added later; optional)
+│   └── music/                     # music tracks (added later; optional)
 └── src/
     ├── settings.ts                # 🛠️ global physics, hearts, camera, scoring
     ├── heroes.ts                  # 🛠️ Colin, Ryan
     ├── hazards.ts                 # 🛠️ hazard definitions
     ├── items.ts                   # 🛠️ donut, burger
+    ├── sounds.ts                  # 🛠️ sound effect + music file list and volumes
     ├── levels/
     │   ├── legend.ts              # 🛠️ map character legend
     │   ├── themes.ts              # 🛠️ palettes + background layers per theme
@@ -191,7 +271,8 @@ super-flynn-bros/
         ├── Hero.ts
         ├── Hazard.ts
         ├── camera.ts
-        └── progress.ts            # localStorage unlocks
+        ├── audio.ts               # sfx/music wrapper; missing files are no-ops
+        └── progress.ts            # localStorage unlocks + mute state
 ```
 
 ### Shared library: `lib/input`
@@ -216,7 +297,11 @@ it").
 
 - **Vitest** unit tests for pure engine modules: `pixelArt` grid parsing,
   `levelLoader` (valid maps, unknown chars, missing start/goal), `validate`
-  (clamping), and `lib/input` binding resolution.
+  (clamping), `lib/input` binding resolution, and the audio wrapper's
+  missing-file handling (playing an unloaded key is a no-op and doesn't throw).
+- Manual check: with `public/assets/sounds/` and `music/` empty, the game runs
+  with no console errors from the game code. (The browser may still log 404s
+  in the network panel.)
 - `npm run typecheck` and `npm run build` pass.
 - Manual browser playthrough: each level is finishable with Colin, with Ryan,
   and in co-op.
@@ -225,7 +310,8 @@ it").
 
 ## Out of Scope (for now)
 
-- Sound effects and music (can be added later via a shared `lib/audio`)
+- Creating the sound effect and music files themselves (the system is built
+  now; files get dropped in later)
 - Online multiplayer
 - Touch controls
 - A level editor UI
