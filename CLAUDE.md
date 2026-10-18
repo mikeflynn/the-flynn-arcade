@@ -1,4 +1,4 @@
-# Web Games — Global Guidelines
+# The Flynn Arcade — Global Guidelines
 
 This repo is a collection of browser-based games that share one stack, one
 Docker Compose file, an optional multiplayer server, and shared libraries.
@@ -17,8 +17,9 @@ and add a line to the [Amendment Log](#amendment-log) at the bottom.
 ## 1. Repository Layout
 
 ```
-web-games/
+the-flynn-arcade/
 ├── CLAUDE.md              # This file — global rules (source of truth)
+├── README.md              # Kid-friendly arcade front page + games table
 ├── docker-compose.yml     # Master compose file: one service per game + server
 ├── package.json           # npm workspaces root (games, lib/*, server)
 ├── server/                # Universal multiplayer server (only if a game needs it)
@@ -209,15 +210,21 @@ At minimum, include:
    and add a server handler only if relay mode isn't enough.
 6. Write the game's `README.md`, including "How It Works" and "Make It Your
    Own" (§3, §7).
-7. Sanity-check tweakability: change a setting and swap the hero image, and
+7. Add a row for the game to the **🎮 The Games** table in the root
+   `README.md`. Keep the root README's fun, kid-friendly tone.
+8. Sanity-check tweakability: change a setting and swap the hero image, and
    confirm both work with hot reload.
-8. Verify `docker compose up --build <game-name>` works.
+9. Verify `docker compose up --build <game-name>` works.
 
 ---
 
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-18 — Repo named **The Flynn Arcade**. Added a kid-friendly root
+  `README.md` with a games table; new-game checklist now includes adding the
+  game to it.
 
 - 2026-10-18 — Added the educational purpose and §7 Kid-Friendly
   Tweakability: a `settings.ts` file, data-driven content, swappable assets,
