@@ -80,6 +80,8 @@ const browserGamepads: GamepadSource = () =>
  */
 export class InputManager {
   private readonly pressedKeys = new Set<string>();
+  /** Keys pressed since the last update(), so a tap shorter than one frame still counts. */
+  private readonly tappedKeys = new Set<string>();
   private readonly bindings = new Map<number, Bindings>();
   private current = new Map<number, Set<string>>();
   private previous = new Map<number, Set<string>>();
@@ -109,9 +111,11 @@ export class InputManager {
   update(): void {
     this.previous = this.current;
     this.current = new Map();
+    const keys = new Set([...this.pressedKeys, ...this.tappedKeys]);
+    this.tappedKeys.clear();
     for (const [player, bindings] of this.bindings) {
       const pad = bindings.pad ? this.readPad(bindings.pad.index) : null;
-      this.current.set(player, resolveActions(bindings, this.pressedKeys, pad));
+      this.current.set(player, resolveActions(bindings, keys, pad));
     }
   }
 
@@ -152,6 +156,7 @@ export class InputManager {
   private readonly onKeyDown = (event: Event): void => {
     const { code } = event as KeyboardEvent;
     this.pressedKeys.add(code);
+    this.tappedKeys.add(code);
     // Stop arrows/space from scrolling the page, but leave other keys alone.
     if (this.boundCodes.has(code)) event.preventDefault();
   };
@@ -163,5 +168,6 @@ export class InputManager {
   private readonly onBlur = (): void => {
     // The window lost focus, so we'll never hear the key-ups. Let go of everything.
     this.pressedKeys.clear();
+    this.tappedKeys.clear();
   };
 }

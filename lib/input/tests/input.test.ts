@@ -70,6 +70,21 @@ describe("InputManager", () => {
     expect(input.isDown(1, "jump")).toBe(false);
   });
 
+  it("catches a tap that's pressed and released between two frames", () => {
+    const target = new EventTarget();
+    const input = new InputManager(target, () => []);
+    input.setBindings(1, bindings);
+    input.update();
+
+    target.dispatchEvent(keyEvent("keydown", "Space"));
+    target.dispatchEvent(keyEvent("keyup", "Space"));
+    input.update();
+    expect(input.justPressed(1, "jump")).toBe(true);
+
+    input.update();
+    expect(input.isDown(1, "jump")).toBe(false);
+  });
+
   it("only blocks the browser's default for keys the game uses", () => {
     const target = new EventTarget();
     const input = new InputManager(target, () => []);
