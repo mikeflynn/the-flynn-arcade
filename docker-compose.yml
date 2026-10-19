@@ -1,15 +1,6 @@
 # Master compose file — one service per game (see CLAUDE.md §4).
 # Add/update a service every time a game is created, renamed, or removed.
 #
-# Example game service:
-#   my-game:
-#     build:
-#       context: .
-#       dockerfile: my-game/Dockerfile
-#     ports:
-#       - "8001:80"
-#     depends_on: [server]   # only for multiplayer games
-#
 # Multiplayer server (add when the first game needs it):
 #   server:
 #     build:
@@ -18,4 +9,11 @@
 #     ports:
 #       - "3000:3000"
 
-services: {}
+services:
+  super-flynn-bros:
+    build:
+      context: .
+      dockerfile: super-flynn-bros/Dockerfile
+    ports:
+      - "8001:80"
+    restart: unless-stopped

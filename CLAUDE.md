@@ -94,7 +94,8 @@ Each game's `README.md` must include:
 | Service  | Host port | Notes                         |
 | -------- | --------- | ----------------------------- |
 | server   | 3000      | Multiplayer WebSocket server (reserved) |
-| _(next game)_ | 8001 | Games get 8001, 8002, … in order |
+| super-flynn-bros | 8001 | 8-bit side scroller (1–2 players, local) |
+| _(next game)_ | 8002 | Games get 8001, 8002, … in order |
 
 Vite dev servers use the same port as the game's host port, so
 `npm run dev -w <game-name>` and Docker never disagree.
@@ -221,6 +222,10 @@ At minimum, include:
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-18 — First game: Super Flynn Bros on port 8001. Added the root
+  npm workspace (`package.json`, `tsconfig.base.json`) and the first shared
+  library, `lib/input` (keyboard + gamepad).
 
 - 2026-10-18 — Repo named **The Flynn Arcade**. Added a kid-friendly root
   `README.md` with a games table; new-game checklist now includes adding the

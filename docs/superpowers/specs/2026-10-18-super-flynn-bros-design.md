@@ -69,7 +69,7 @@ Defined in `src/items.ts`.
   like the original. Players can't walk off the left edge of the screen.
 - Co-op: a trailing player who touches the left edge of the camera is pushed
   along, so nobody gets stuck off-screen.
-- Logical resolution **320×180**, scaled to fit the window with pixel-perfect
+- Logical resolution **320×176** (exactly 11 tile rows), scaled to fit the window with pixel-perfect
   (nearest-neighbor) scaling.
 
 ## Levels
@@ -150,10 +150,9 @@ export const level1 = {
   ],
 };
 ```
-A shared legend (in `src/levels/legend.ts`) maps characters to tiles, items,
-hazards, and markers: `#` sidewalk/ground, `=` platform (curb, car roof), `B`
-trash bin, `o` donut, `b` burger, `1`/`2` player starts, `G` goal, letters for
-hazards from `hazards.ts`. Unknown characters render as a "?" block with a
+Each tile, hazard, and item declares its own `mapChar` in `tiles.ts`,
+`hazards.ts`, or `items.ts`. The markers `1`, `2`, `G` are fixed in
+`engine/levelLoader.ts`. Unknown characters render as a "?" block with a
 console warning.
 
 ### Safety nets
@@ -253,9 +252,9 @@ super-flynn-bros/
     ├── heroes.ts                  # 🛠️ Colin, Ryan
     ├── hazards.ts                 # 🛠️ hazard definitions
     ├── items.ts                   # 🛠️ donut, burger
+    ├── tiles.ts                   # 🛠️ tiles + goal sign art
     ├── sounds.ts                  # 🛠️ sound effect + music file list and volumes
     ├── levels/
-    │   ├── legend.ts              # 🛠️ map character legend
     │   ├── themes.ts              # 🛠️ palettes + background layers per theme
     │   ├── level1-school.ts       # 🛠️
     │   ├── level2-track.ts        # 🛠️

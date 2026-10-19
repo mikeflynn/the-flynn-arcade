@@ -28,7 +28,7 @@ hit save, you can change a game.
 
 | Game | What it is | Players | Make-it-your-own ideas |
 | ---- | ---------- | ------- | ---------------------- |
-| _Coming soon…_ | The first cabinet is still being built! 🔧 | | |
+| [**Super Flynn Bros**](super-flynn-bros/) 🏃 | An 8-bit side scroller: help Colin and Ryan walk to school, practice, and back home through Woodland Hills. Dodge dogs and sprinklers, grab donuts! 🍩 | 1–2 (co-op) | Make the hero look like you, change gravity for moon jumps, invent new hazards, build your own street |
 
 Every game has its own folder with a `README.md` that tells you:
 - **How to play:** the controls and the goal
