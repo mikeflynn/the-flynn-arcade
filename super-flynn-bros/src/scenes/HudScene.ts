@@ -1,5 +1,7 @@
 import Phaser from "phaser";
 import { formatTime, textStyle } from "../engine/ui";
+import { getServices } from "../engine/services";
+import { fitBody } from "../engine/sprites";
 
 export interface HudState {
   score: number;
@@ -46,7 +48,10 @@ export class HudScene extends Phaser.Scene {
         keep(this.add.image(44 + i * 10, y, "heart", i < hero.hearts ? 0 : 1).setAlpha(hero.out ? 0.4 : 1));
       }
     });
-    keep(this.add.image(200, 7, "donut", 0).setScale(0.8));
+    const donut = this.add.image(200, 7, "donut", 0);
+    const art = getServices().artSizes.get("donut") ?? { width: donut.frame.width, height: donut.frame.height };
+    // Sized from the art, so a big custom donut.png still fits in the HUD.
+    keep(donut.setScale(0.8 * fitBody({ width: donut.frame.width, height: donut.frame.height }, art).scale));
     keep(this.add.text(208, 7, `x${state.donuts}`, textStyle(8)).setOrigin(0, 0.5));
     keep(this.add.text(316, 7, formatTime(state.timeMs), textStyle(8)).setOrigin(1, 0.5));
     keep(this.add.text(316, 18, `SCORE ${state.score}`, textStyle(8)).setOrigin(1, 0.5));

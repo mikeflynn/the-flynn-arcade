@@ -1,8 +1,7 @@
 import Phaser from "phaser";
 import { settings } from "../settings";
 import { levels } from "../levels";
-import { heroes as heroDefs } from "../heroes";
-import { catalog } from "../engine/catalog";
+import { catalog, checkedHeroes as heroDefs } from "../engine/catalog";
 import { findRespawn, findSafeSpawn, loadLevel, tileVariant, TILE_SIZE, type Cell, type LoadedLevel } from "../engine/levelLoader";
 import { tileFrame } from "../engine/tileset";
 import { createBackground } from "../engine/backgrounds";
