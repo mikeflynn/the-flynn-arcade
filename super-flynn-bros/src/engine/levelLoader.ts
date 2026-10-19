@@ -87,6 +87,20 @@ export function findSafeSpawn(level: Pick<LoadedLevel, "solid" | "cols">, fromCo
   return null;
 }
 
+/**
+ * Where to put a hero after falling in a pit: a couple of tiles before their
+ * last safe spot, so holding "right" doesn't walk them straight back in.
+ * Never left of `minCol` (the edge of the screen).
+ */
+export function findRespawn(
+  level: Pick<LoadedLevel, "solid" | "cols">,
+  lastSafeCol: number,
+  minCol: number,
+  stepBack = 2,
+): Cell | null {
+  return findSafeSpawn(level, Math.max(minCol, lastSafeCol - stepBack));
+}
+
 /** Which drawing a tile uses, based on its neighbors. */
 export function tileVariant(
   tiles: (string | null)[][],

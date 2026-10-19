@@ -22,6 +22,8 @@ export class Hero extends Phaser.Physics.Arcade.Sprite {
   /** Last spot with ground under both feet; falling in a pit sends you back here. */
   lastSafe: { x: number; y: number };
   private safeUntil = 0;
+  /** After falling in a pit, controls pause briefly so a held arrow key doesn't run you straight back in. */
+  private frozenUntil = 0;
   private lastGroundedAt = Number.NEGATIVE_INFINITY;
   private jumpBufferedAt = Number.NEGATIVE_INFINITY;
   private rising = false;
@@ -58,6 +60,7 @@ export class Hero extends Phaser.Physics.Arcade.Sprite {
     this.wasOnGround = onGround;
 
     // Running: speed up toward the top speed, slow down when you let go.
+    if (now < this.frozenUntil) controls = { left: false, right: false, jumpHeld: false, jumpPressed: false };
     const dir = (controls.right ? 1 : 0) - (controls.left ? 1 : 0);
     const control = onGround ? 1 : settings.airControl;
     let vx = body.velocity.x;
@@ -113,6 +116,7 @@ export class Hero extends Phaser.Physics.Arcade.Sprite {
   fall(now: number, spawn: { x: number; y: number }): void {
     this.hearts = Math.max(0, this.hearts - 1);
     this.safeUntil = now + settings.safeTimeMs;
+    this.frozenUntil = now + 500;
     this.placeAt(spawn.x, spawn.y);
   }
 

@@ -62,6 +62,8 @@ async function start(): Promise<void> {
     },
   });
   game.events.on(Phaser.Core.Events.PRE_STEP, globalStep);
+  // ?debug=1 also exposes the game in the browser console as `game`, for poking around.
+  if (params.has("debug")) (window as unknown as { game: Phaser.Game }).game = game;
 }
 
 void start();

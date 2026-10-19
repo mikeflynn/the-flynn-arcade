@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCharLookup, findSafeSpawn, loadLevel, tileVariant, UNKNOWN_TILE_KEY, type LevelCatalog } from "../src/engine/levelLoader";
+import { buildCharLookup, findRespawn, findSafeSpawn, loadLevel, tileVariant, UNKNOWN_TILE_KEY, type LevelCatalog } from "../src/engine/levelLoader";
 import type { HazardDef, ItemDef, TileDef } from "../src/engine/types";
 
 const tile = (key: string, mapChar: string, solid = true): TileDef => ({ key, name: key, mapChar, solid, colors: {}, art: [] });
@@ -99,6 +99,19 @@ describe("findSafeSpawn", () => {
   it("needs room for a hero above the ground", () => {
     const low = loadLevel(["##", "##"], catalog);
     expect(findSafeSpawn(low, 0)).toBeNull();
+  });
+});
+
+describe("findRespawn", () => {
+  //                            0123456789
+  const level = loadLevel(["          ", "          ", "          ", "####  ####"], catalog);
+
+  it("puts you back a couple of tiles before the pit, not right at its edge", () => {
+    expect(findRespawn(level, 3, 0)).toEqual({ col: 1, row: 2 });
+  });
+
+  it("never goes back past the left edge of the screen", () => {
+    expect(findRespawn(level, 3, 2)).toEqual({ col: 2, row: 2 });
   });
 });
 

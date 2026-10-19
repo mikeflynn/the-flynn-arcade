@@ -3,7 +3,7 @@ import { settings } from "../settings";
 import { levels } from "../levels";
 import { heroes as heroDefs } from "../heroes";
 import { catalog } from "../engine/catalog";
-import { findSafeSpawn, loadLevel, tileVariant, TILE_SIZE, type Cell, type LoadedLevel } from "../engine/levelLoader";
+import { findRespawn, findSafeSpawn, loadLevel, tileVariant, TILE_SIZE, type Cell, type LoadedLevel } from "../engine/levelLoader";
 import { tileFrame } from "../engine/tileset";
 import { createBackground } from "../engine/backgrounds";
 import { nextScrollX } from "../engine/camera";
@@ -214,9 +214,12 @@ export class PlayScene extends Phaser.Scene {
 
   /** A safe place to stand at or after `x` that's on screen. */
   private spawnPoint(x: number): { x: number; y: number } {
-    const firstVisibleCol = Math.ceil(this.cameras.main.scrollX / TILE_SIZE) + 1;
-    const col = Math.max(Math.floor(x / TILE_SIZE), firstVisibleCol);
+    const col = Math.max(Math.floor(x / TILE_SIZE), this.firstVisibleCol());
     return feetOf(findSafeSpawn(this.level, col) ?? this.level.starts[1]);
+  }
+
+  private firstVisibleCol(): number {
+    return Math.ceil(this.cameras.main.scrollX / TILE_SIZE) + 1;
   }
 
   private onBump(hero: Hero, hazard: Hazard): void {
@@ -229,7 +232,8 @@ export class PlayScene extends Phaser.Scene {
 
   private onFall(hero: Hero): void {
     getServices().audio.playSfx("fall");
-    hero.fall(this.time.now, this.spawnPoint(hero.lastSafe.x));
+    const cell = findRespawn(this.level, Math.floor(hero.lastSafe.x / TILE_SIZE), this.firstVisibleCol());
+    hero.fall(this.time.now, feetOf(cell ?? this.level.starts[1]));
     this.checkHearts(hero);
   }
 
