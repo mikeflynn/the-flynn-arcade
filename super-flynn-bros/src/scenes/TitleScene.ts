@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { createBackground } from "../engine/backgrounds";
 import { tileFrame } from "../engine/tileset";
 import { addPicture } from "../engine/sprites";
-import { getServices, useControls, type GameMode } from "../engine/services";
+import { getServices, goToArcade, useControls, type GameMode } from "../engine/services";
 import { addText, blink, Menu } from "../engine/ui";
 import { levels } from "../levels";
 
@@ -58,7 +58,9 @@ export class TitleScene extends Phaser.Scene {
 
   private showModeMenu(): void {
     this.state = "menu";
-    this.setMenu(76, () => ["1P COLIN", "1P RYAN", "2P CO-OP"], (i) => this.pickMode(MODES[i]));
+    this.setMenu(72, () => ["1P COLIN", "1P RYAN", "2P CO-OP", "BACK TO ARCADE"], (i) =>
+      i < MODES.length ? this.pickMode(MODES[i]) : goToArcade(),
+    );
   }
 
   private pickMode(mode: GameMode): void {

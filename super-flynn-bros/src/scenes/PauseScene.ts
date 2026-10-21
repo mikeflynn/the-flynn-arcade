@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { getServices, toggleMute, useControls } from "../engine/services";
+import { getServices, goToArcade, toggleMute, useControls } from "../engine/services";
 import { addText, Menu } from "../engine/ui";
 
 export class PauseScene extends Phaser.Scene {
@@ -18,7 +18,7 @@ export class PauseScene extends Phaser.Scene {
       this,
       width / 2,
       82,
-      () => ["RESUME", `SOUND: ${getServices().audio.muted ? "OFF" : "ON"}`, "QUIT TO TITLE"],
+      () => ["RESUME", `SOUND: ${getServices().audio.muted ? "OFF" : "ON"}`, "QUIT TO TITLE", "QUIT TO ARCADE"],
       (i) => this.pick(i),
       (key) => audio.playSfx(key),
     );
@@ -36,7 +36,8 @@ export class PauseScene extends Phaser.Scene {
   private pick(index: number): void {
     if (index === 0) this.resume();
     else if (index === 1) toggleMute();
-    else this.quit();
+    else if (index === 2) this.quit();
+    else goToArcade();
   }
 
   private resume(): void {

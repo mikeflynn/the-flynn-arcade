@@ -1,4 +1,5 @@
 import { mergeBindings, type InputManager } from "@web-games/input";
+import { arcadeUrl } from "@web-games/arcade";
 import { player1Controls, player2Controls } from "../controls";
 import type { GameAudio } from "@web-games/audio";
 import { saveProgress, unlockLevel, type Progress } from "./progress";
@@ -55,6 +56,11 @@ export function unlock(levelNumber: number): void {
   const services = getServices();
   services.progress = unlockLevel(services.progress, levelNumber);
   saveProgress(services.progress);
+}
+
+/** Leaves the game and goes back to The Flynn Arcade, with this game's cabinet selected. */
+export function goToArcade(): void {
+  window.location.assign(arcadeUrl("super-flynn-bros", { dev: import.meta.env.DEV }));
 }
 
 /** Runs every frame before the scenes: reads input, and handles keys that work everywhere. */

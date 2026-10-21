@@ -21,6 +21,8 @@ the neighbors who walk *really* slowly. Grab donuts on the way! 🍩
 | Gamepad | First gamepad | Second gamepad |
 
 - **Esc** pauses. **M** turns the sound on and off.
+- **BACK TO ARCADE** (title menu) or **QUIT TO ARCADE** (pause menu) takes
+  you back to The Flynn Arcade to pick another game.
 - Hold jump longer to jump higher. Tap it for a little hop.
 - **Colin** is taller and jumps higher. **Ryan** is shorter and runs faster.
 - Each hero has **3 hearts**. Bumping a hazard or falling in a pit costs one.
@@ -235,5 +237,8 @@ That's OK. Everybody breaks things, and it's how you learn!
 - Kid-editable files: `src/settings.ts`, `src/heroes.ts`, `src/hazards.ts`,
   `src/items.ts`, `src/tiles.ts`, `src/sounds.ts`, `src/controls.ts`,
   `src/levels/*`. Everything in `src/engine/` and `src/scenes/` is the machinery.
-- Shared library used: [`lib/input`](../lib/input) (keyboard + gamepad).
+- Shared libraries used: [`lib/input`](../lib/input), [`lib/pixel-art`](../lib/pixel-art),
+  [`lib/audio`](../lib/audio), [`lib/settings`](../lib/settings), [`lib/arcade`](../lib/arcade).
+- [`arcade.ts`](arcade.ts) is how this game shows up in The Flynn Arcade
+  (cabinet colors, blurb, and the picture on its screen).
 - **Asset credits:** all art is drawn in code in this repo. No third-party assets.
