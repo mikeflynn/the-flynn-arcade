@@ -70,8 +70,8 @@ No image files are needed.
   outline brightening and dimming at ~2 Hz).
 - **Other cabinets:** full color at 0.9× scale.
 - **"COMING SOON" cabinets:** grey bodies with a bouncing **"?"** on the screen.
-  - How many: enough to fill the row to at least 3 cabinets, plus one extra
-    at the end, configurable as `comingSoonCabinets` (default 2).
+  - How many: `comingSoonCabinets` of them (default 2), always added after
+    the real games.
   - They can be selected but not started.
 
 ### Selection cursor
