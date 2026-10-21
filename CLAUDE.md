@@ -37,7 +37,7 @@ the-flynn-arcade/
 - Each game lives in its own **kebab-case** directory at the repo root
   (e.g. `space-pong/`, `tic-tac-toe/`).
 - Reserved root directory names (never use for a game): `arcade`, `server`,
-  `lib`, `docs`, `scripts`, `node_modules`.
+  `lib`, `deploy`, `docs`, `scripts`, `node_modules`.
 - Games must not import from other games. Anything shared goes in `lib/`.
 
 ## 2. Stack (all games)
@@ -93,6 +93,11 @@ Each game's `README.md` must include:
   set `dockerfile: <game-name>/Dockerfile`.
 - Games that need the multiplayer server declare `depends_on: [server]`.
 - The `server` service is only added once the first game needs it.
+- **Production:** `docker-compose.prod.yml` is layered on top for a real web
+  server. It adds Caddy (HTTPS, `deploy/Caddyfile`) on 80/443 and hides every
+  other service's ports with `ports: !reset []`. **Every new service needs that
+  `ports: !reset []` entry there too**, so only the arcade is reachable.
+  Deploy steps are in the root `README.md`.
 
 ### Port Registry
 
@@ -216,7 +221,8 @@ At minimum, include:
    `src/settings.ts` and assets in `public/assets/` (§7).
 2. Add it to root `package.json` workspaces (if not covered by a glob).
 3. Assign the next free port in the §4 registry.
-4. Add its service to `docker-compose.yml`.
+4. Add its service to `docker-compose.yml`, and a `ports: !reset []` entry for
+   it in `docker-compose.prod.yml` (§4).
 5. If it's multiplayer: ensure the `server` service exists, use `lib/net`,
    and add a server handler only if relay mode isn't enough.
 6. Write the game's `README.md`, including "How It Works" and "Make It Your
@@ -255,6 +261,10 @@ game cabinet. It's a Vite + Phaser app like the games.
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-22 — Production deploy: `docker-compose.prod.yml` + Caddy
+  (`deploy/`) for HTTPS on a real server; new services must hide their ports
+  there. `deploy` is now a reserved directory name.
 
 - 2026-10-21 — Added **The Flynn Arcade** launcher (`arcade/`, port 8000) and
   §10. Games join with `<game>/arcade.ts`. Promoted shared code into

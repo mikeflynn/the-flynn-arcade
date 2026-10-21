@@ -92,6 +92,35 @@ Quick overview:
 - **`arcade/`** is the game picker everyone starts from, at port 8000
 - **`docker-compose.yml`** runs the whole arcade
 
+### 🌐 Putting the arcade on the internet
+
+The arcade runs on any Linux server with Docker (2 GB of memory is
+comfortable, since it builds the games on the server). **Caddy** sits in front
+and gets an HTTPS certificate for your domain automatically. HTTPS matters:
+browsers only allow gamepads on secure pages.
+
+1. Point your domain's DNS (an `A` record, like `arcade.yourdomain.com`) at the
+   server, and open ports 80 and 443 in its firewall.
+2. On the server:
+   ```bash
+   git clone https://github.com/mikeflynn/the-flynn-arcade.git
+   cd the-flynn-arcade
+   cp .env.example .env      # then set ARCADE_DOMAIN to your domain
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+   ```
+3. Open `https://arcade.yourdomain.com`. 🎉
+
+**To update** after pushing new changes:
+```bash
+git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+How it fits together: [`docker-compose.prod.yml`](docker-compose.prod.yml) adds
+Caddy (see [`deploy/Caddyfile`](deploy/Caddyfile)) on ports 80/443 and hides
+every other port, so visitors only reach the arcade, which forwards
+`/<game-name>/` to each game. Everything restarts on its own after a reboot.
+It needs Docker Compose 2.24 or newer.
+
 ---
 
 <p align="center"><b>GAME OVER?</b> Never. Just press <b>START</b> again. 🕹️</p>
