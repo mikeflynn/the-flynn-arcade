@@ -1,4 +1,4 @@
-import type { Range } from "./validate";
+import type { Range } from "@web-games/settings";
 
 /** Safe ranges for everything in settings.ts. Out-of-range values get clamped. */
 export const settingLimits: Record<string, Range> = {

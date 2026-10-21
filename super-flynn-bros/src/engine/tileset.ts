@@ -1,5 +1,5 @@
 import type Phaser from "phaser";
-import { addTextureFromFrames, parseFrames, type ParsedGrid } from "./pixelArt";
+import { addTextureFromFrames, parseFrames, type ParsedGrid } from "@web-games/pixel-art";
 import { TILE_SIZE, UNKNOWN_TILE_KEY } from "./levelLoader";
 import type { TileDef } from "./types";
 

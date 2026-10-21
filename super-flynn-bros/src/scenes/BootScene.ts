@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import type { InputManager } from "@web-games/input";
 import { catalog, heroList } from "../engine/catalog";
-import { makeSpriteSheet } from "../engine/pixelArt";
+import { makeSpriteSheet } from "@web-games/pixel-art";
 import { nextAttempts } from "../engine/assets";
 import { buildTileset } from "../engine/tileset";
 import { GameAudio } from "../engine/audio";

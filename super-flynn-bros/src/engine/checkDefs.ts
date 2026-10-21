@@ -1,4 +1,4 @@
-import { clampSettings, type Range } from "./validate";
+import { clampSettings, type Range } from "@web-games/settings";
 import type { HazardDef, HeroDef, Size } from "./types";
 
 // Safe ranges for the numbers in heroes.ts and hazards.ts, so a typo like a

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFrames } from "../src/engine/pixelArt";
+import { parseFrames } from "@web-games/pixel-art";
 import { buildCharLookup } from "../src/engine/levelLoader";
 import { catalog, heroList } from "../src/engine/catalog";
 import { colin, ryan } from "../src/heroes";

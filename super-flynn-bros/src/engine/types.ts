@@ -1,4 +1,4 @@
-import type { Palette } from "./pixelArt";
+import type { Palette } from "@web-games/pixel-art";
 import type { ThemeName } from "../levels/themes";
 import type { MusicKey, SoundKey } from "../sounds";
 

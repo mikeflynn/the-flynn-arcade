@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@web-games/input": "*",
+    "@web-games/pixel-art": "*",
+    "@web-games/settings": "*",
     "phaser": "3.90.0"
   },
   "devDependencies": {

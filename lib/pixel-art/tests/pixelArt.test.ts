@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFrames, stripFrameCount, UNKNOWN_COLOR } from "../src/engine/pixelArt";
+import { parseFrames, stripFrameCount, UNKNOWN_COLOR } from "../src/index";
 
 const colors = { R: "#ff0000", B: "#0000ff" };
 

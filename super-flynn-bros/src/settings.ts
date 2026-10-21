@@ -8,7 +8,7 @@
 //
 // Want to change how Colin or Ryan run and jump? That's in heroes.ts.
 
-import { clampSettings } from "./engine/validate";
+import { clampSettings } from "@web-games/settings";
 import { settingLimits } from "./engine/limits";
 
 export const mySettings = {
