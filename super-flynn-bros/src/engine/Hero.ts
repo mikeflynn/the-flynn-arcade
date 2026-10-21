@@ -28,6 +28,8 @@ export class Hero extends Phaser.Physics.Arcade.Sprite {
   private jumpBufferedAt = Number.NEGATIVE_INFINITY;
   private rising = false;
   private wasOnGround = false;
+  /** Being placed on the ground (level start, respawn) isn't a landing, so the next touchdown makes no "land" sound. */
+  private justPlaced = true;
   /** True for the one frame when the hero touches down after being in the air. */
   landed = false;
 
@@ -56,7 +58,8 @@ export class Hero extends Phaser.Physics.Arcade.Sprite {
     const dt = deltaMs / 1000;
     const onGround = body.blocked.down;
     if (onGround) this.lastGroundedAt = now;
-    this.landed = onGround && !this.wasOnGround;
+    this.landed = onGround && !this.wasOnGround && !this.justPlaced;
+    if (onGround) this.justPlaced = false;
     this.wasOnGround = onGround;
 
     // Running: speed up toward the top speed, slow down when you let go.
@@ -126,6 +129,7 @@ export class Hero extends Phaser.Physics.Arcade.Sprite {
 
   placeAt(x: number, y: number): void {
     this.body.reset(x, y);
+    this.justPlaced = true;
     this.lastSafe = { x, y };
   }
 

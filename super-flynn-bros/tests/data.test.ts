@@ -7,6 +7,7 @@ import { hazards } from "../src/hazards";
 import { heartArt, items } from "../src/items";
 import { goalArt, tiles } from "../src/tiles";
 import { soundEffects } from "../src/sounds";
+import { player1Controls, player2Controls } from "../src/controls";
 
 const noWarnings = (frames: string[][], colors: Record<string, string>, name: string) =>
   expect(parseFrames(frames, colors, name).warnings).toEqual([]);
@@ -68,6 +69,11 @@ describe("game data", () => {
     expect(colin.frames.idle.length).toBeGreaterThan(ryan.frames.idle.length);
     expect(colin.jumpPower).toBeGreaterThan(ryan.jumpPower);
     expect(ryan.runSpeed).toBeGreaterThan(colin.runSpeed);
+  });
+
+  it("both players have a key to pick menu items", () => {
+    expect(player1Controls.keys.confirm.length).toBeGreaterThan(0);
+    expect(player2Controls.keys.confirm.length).toBeGreaterThan(0);
   });
 
   it("every item plays a sound that exists", () => {

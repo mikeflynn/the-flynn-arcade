@@ -23,7 +23,10 @@ export class TitleScene extends Phaser.Scene {
     this.state = "press";
     this.menu = null;
     const { width } = this.scale;
-    const { tileset, artSizes } = getServices();
+    const { tileset, artSizes, audio } = getServices();
+    // Swap to the title music right away (after quitting or the ending). On the
+    // very first visit the browser holds it until the first key press.
+    audio.playMusic("title");
 
     createBackground(this, "morning", GROUND_Y)(0);
     this.add.tileSprite(0, GROUND_Y, width, 16, "tiles", tileFrame(tileset, "sidewalk", "art")).setOrigin(0);

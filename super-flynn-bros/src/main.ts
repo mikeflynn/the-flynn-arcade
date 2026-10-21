@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { InputManager } from "@web-games/input";
-import { findAssets, makeHttpExists } from "./engine/assets";
+import { findAllAssets, findAssets, makeHttpExists } from "./engine/assets";
 import { audioCandidates } from "./engine/audio";
 import { spriteOverrideCandidates } from "./engine/catalog";
 import { loadProgress } from "./engine/progress";
@@ -30,7 +30,7 @@ async function start(): Promise<void> {
   const exists = makeHttpExists();
   const [overrides, audioFiles] = await Promise.all([
     findAssets(spriteOverrideCandidates(), exists),
-    findAssets(audioCandidates(soundEffects, musicTracks), exists),
+    findAllAssets(audioCandidates(soundEffects, musicTracks), exists),
   ]);
   const boot: BootData = {
     input: new InputManager(window),

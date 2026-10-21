@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findAssets, makeHttpExists } from "../src/engine/assets";
+import { findAllAssets, findAssets, makeHttpExists, nextAttempts } from "../src/engine/assets";
 
 describe("findAssets", () => {
   it("picks the first address that exists and leaves out missing files", async () => {
@@ -25,6 +25,44 @@ describe("findAssets", () => {
       throw new Error("offline");
     });
     expect(found.size).toBe(0);
+  });
+});
+
+describe("findAllAssets", () => {
+  it("keeps every address that exists, in order, so a broken file can fall back to the next", async () => {
+    const files = new Set(["jump.mp3", "jump.ogg", "donut.ogg"]);
+    const found = await findAllAssets(
+      [
+        { key: "jump", urls: ["jump.mp3", "jump.ogg"] },
+        { key: "donut", urls: ["donut.mp3", "donut.ogg"] },
+        { key: "bark", urls: ["bark.mp3", "bark.ogg"] },
+      ],
+      async (url) => files.has(url),
+    );
+    expect(found).toEqual(
+      new Map([
+        ["jump", ["jump.mp3", "jump.ogg"]],
+        ["donut", ["donut.ogg"]],
+      ]),
+    );
+  });
+});
+
+describe("nextAttempts", () => {
+  it("picks the next file for each sound that didn't load, and remembers what's left", () => {
+    const backups = new Map([
+      ["sfx:jump", ["jump.ogg"]],
+      ["sfx:land", ["land.ogg"]],
+      ["sfx:bark", []],
+    ]);
+    const loaded = new Set(["sfx:land"]);
+    const { attempts, remaining } = nextAttempts(backups, (key) => loaded.has(key));
+    expect(attempts).toEqual([["sfx:jump", "jump.ogg"]]);
+    expect(remaining).toEqual(new Map([["sfx:jump", []]]));
+  });
+
+  it("has nothing to try once every backup is used up", () => {
+    expect(nextAttempts(new Map([["sfx:jump", []]]), () => false).attempts).toEqual([]);
   });
 });
 

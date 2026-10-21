@@ -1,6 +1,7 @@
 // 🛠️ LEVEL 4: Walk Back Home
 //
 // Each line is one row of the level. Each letter is one 16 x 16 tile.
+// Keep it 11 rows tall: that's exactly one screen.
 //
 //   #  sidewalk          =  brick planter     B  trash bin
 //   c  parked car        F  picket fence

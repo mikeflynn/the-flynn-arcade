@@ -22,6 +22,9 @@ export interface PlayData {
   score: number;
 }
 
+/** One screen tall: 176 pixels / 16-pixel tiles. */
+const LEVEL_ROWS = 11;
+
 /** Where a sprite stands when it's placed in map cell `cell` (bottom-center of the cell). */
 const feetOf = (cell: Cell) => ({ x: cell.col * TILE_SIZE + TILE_SIZE / 2, y: (cell.row + 1) * TILE_SIZE });
 
@@ -35,7 +38,8 @@ export class PlayScene extends Phaser.Scene {
   private updateBackground: (scrollX: number) => void = () => {};
   private score = 0;
   private donuts = 0;
-  private startedAt = 0;
+  /** Time spent playing this level. Counted from frames, so time spent paused doesn't count. */
+  private elapsedMs = 0;
   private finished = false;
 
   constructor() {
@@ -48,12 +52,13 @@ export class PlayScene extends Phaser.Scene {
     this.score = run.score;
     this.donuts = 0;
     this.finished = false;
+    this.elapsedMs = 0;
   }
 
   create(): void {
     const { audio, tileset, artSizes } = getServices();
     this.def = levels[this.run.levelIndex] ?? levels[0];
-    this.level = loadLevel(this.def.map, catalog, this.def.name);
+    this.level = loadLevel(this.def.map, catalog, this.def.name, { expectedRows: LEVEL_ROWS });
     this.level.warnings.forEach((message) => console.warn(message));
     const worldWidth = this.level.cols * TILE_SIZE;
     const worldHeight = this.level.rows * TILE_SIZE;
@@ -131,7 +136,6 @@ export class PlayScene extends Phaser.Scene {
 
     this.scene.launch("Hud");
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scene.stop("Hud"));
-    this.startedAt = this.time.now;
     audio.playMusic(this.def.music ?? (`level${this.run.levelIndex + 1}` as MusicKey));
     cam.fadeIn(300);
   }
@@ -140,6 +144,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.finished) return;
     const { input, audio } = getServices();
     const now = this.time.now;
+    this.elapsedMs += delta;
 
     if (input.anyJustPressed("pause")) {
       audio.playSfx("pause");
@@ -185,7 +190,7 @@ export class PlayScene extends Phaser.Scene {
     }
 
     this.updateBackground(cam.scrollX);
-    this.events.emit("hud", this.hudState(now));
+    this.events.emit("hud", this.hudState());
   }
 
   private readonly isGroundAt = (x: number, y: number): boolean =>
@@ -265,6 +270,7 @@ export class PlayScene extends Phaser.Scene {
   private onCollect(hero: Hero, sprite: Phaser.Physics.Arcade.Sprite): void {
     if (!sprite.active || hero.isOut) return;
     const def = sprite.getData("def") as ItemDef;
+    this.tweens.killTweensOf(sprite);
     sprite.destroy();
     this.score += def.score;
     if (def.key === "donut") this.donuts++;
@@ -280,7 +286,7 @@ export class PlayScene extends Phaser.Scene {
     audio.playSfx("goal");
     unlock(Math.min(levels.length, this.run.levelIndex + 2));
     this.physics.pause();
-    const timeMs = this.time.now - this.startedAt;
+    const timeMs = this.elapsedMs;
     this.time.delayedCall(1200, () =>
       this.scene.start("LevelComplete", {
         mode: this.run.mode,
@@ -292,11 +298,11 @@ export class PlayScene extends Phaser.Scene {
     );
   }
 
-  private hudState(now: number): HudState {
+  private hudState(): HudState {
     return {
       score: this.score,
       donuts: this.donuts,
-      timeMs: now - this.startedAt,
+      timeMs: this.elapsedMs,
       heroes: this.heroes.map((h) => ({ name: h.def.name, hearts: h.hearts, out: h.isOut })),
       maxHearts: settings.maxHearts,
       muted: getServices().audio.muted,

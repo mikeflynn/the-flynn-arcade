@@ -31,6 +31,40 @@ export async function findAssets(candidates: AssetCandidate[], exists: UrlExists
   return found;
 }
 
+/**
+ * Like findAssets, but keeps every address that exists, in order. Used for
+ * sounds: if jump.mp3 turns out to be broken, the game can try jump.ogg.
+ */
+export async function findAllAssets(candidates: AssetCandidate[], exists: UrlExists): Promise<Map<string, string[]>> {
+  const found = new Map<string, string[]>();
+  await Promise.all(
+    candidates.map(async ({ key, urls }) => {
+      const checks = await Promise.all(urls.map((url) => exists(url).catch(() => false)));
+      const present = urls.filter((_, i) => checks[i]);
+      if (present.length > 0) found.set(key, present);
+    }),
+  );
+  return found;
+}
+
+/**
+ * After a loading round: for each file that didn't load (missing or broken),
+ * the next address to try, plus the backups still left after that.
+ */
+export function nextAttempts(
+  backups: ReadonlyMap<string, string[]>,
+  isLoaded: (key: string) => boolean,
+): { attempts: [string, string][]; remaining: Map<string, string[]> } {
+  const attempts: [string, string][] = [];
+  const remaining = new Map<string, string[]>();
+  for (const [key, urls] of backups) {
+    if (isLoaded(key) || urls.length === 0) continue;
+    attempts.push([key, urls[0]]);
+    remaining.set(key, urls.slice(1));
+  }
+  return { attempts, remaining };
+}
+
 /** Asks the web server whether a file is there, without downloading it. */
 export function makeHttpExists(fetchFn: typeof fetch = (input, init) => fetch(input, init)): UrlExists {
   return async (url) => {

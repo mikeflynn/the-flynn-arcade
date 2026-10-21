@@ -118,7 +118,12 @@ export function tileVariant(
 }
 
 /** Reads a text map into tiles, hazards, items, starts, and the goal. Never throws. */
-export function loadLevel(map: readonly string[], catalog: LevelCatalog, name = "level"): LoadedLevel {
+export function loadLevel(
+  map: readonly string[],
+  catalog: LevelCatalog,
+  name = "level",
+  options: { expectedRows?: number } = {},
+): LoadedLevel {
   const { lookup, warnings } = buildCharLookup(catalog);
   const rows = Math.max(1, map.length);
   const cols = Math.max(1, ...map.map((line) => line.length));
@@ -154,6 +159,12 @@ export function loadLevel(map: readonly string[], catalog: LevelCatalog, name = 
       }
     });
   });
+
+  if (options.expectedRows !== undefined && map.length !== options.expectedRows) {
+    warnings.push(
+      `${name}: levels should be ${options.expectedRows} rows tall, but this one is ${map.length}. Some of it may be off the screen.`,
+    );
+  }
 
   for (const [char, at] of unknown) {
     warnings.push(

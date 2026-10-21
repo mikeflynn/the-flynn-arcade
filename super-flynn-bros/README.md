@@ -17,6 +17,7 @@ the neighbors who walk *really* slowly. Grab donuts on the way! 🍩
 |---|---|---|
 | Move | ← → | A / D |
 | Jump | ↑ or Space | W |
+| Pick a menu item | Enter or Space | E |
 | Gamepad | First gamepad | Second gamepad |
 
 - **Esc** pauses. **M** turns the sound on and off.
@@ -170,7 +171,8 @@ one row; each letter is one tile:
 
 That's Colin (`1`) and Ryan (`2`) on the sidewalk, with a dog (`D`) between
 two trash bins (`B`). The list of letters is at the top of each level file.
-Keep pits 3 tiles wide or less so you can jump them.
+Keep pits 3 tiles wide or less so you can jump them, and keep every level
+**11 rows tall** (one screen). The game warns you in the console if it isn't.
 
 **A brand-new level:** copy `level4-home.ts` to `level5-park.ts`, rename
 `level4` to `level5` inside it, then add it to the list in
@@ -189,7 +191,8 @@ Music goes in `public/assets/music/`: `title` `level1` `level2` `level3`
 `level4` `level-complete` `ending`.
 
 The full list, with volumes, is in [`src/sounds.ts`](src/sounds.ts). The
-browser console shows which ones are still missing.
+browser console shows which ones are still missing. If a `.mp3` won't play,
+the game tries a `.ogg` with the same name instead.
 
 ### 6. Challenges 🏆
 

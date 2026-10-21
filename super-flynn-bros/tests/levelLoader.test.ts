@@ -66,6 +66,15 @@ describe("loadLevel", () => {
     expect(level.warnings[0]).toContain('more than one "1"');
   });
 
+  it("warns when a map isn't the expected height", () => {
+    const level = loadLevel(["1  G", "####"], catalog, "Short", { expectedRows: 11 });
+    expect(level.warnings).toEqual(["Short: levels should be 11 rows tall, but this one is 2. Some of it may be off the screen."]);
+  });
+
+  it("doesn't warn about height unless asked to", () => {
+    expect(loadLevel(["1  G", "####"], catalog).warnings).toEqual([]);
+  });
+
   it("never throws on an empty map", () => {
     expect(() => loadLevel([], catalog)).not.toThrow();
   });

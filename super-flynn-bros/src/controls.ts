@@ -50,7 +50,7 @@ export const player2Controls: Bindings = {
     up: ["KeyW"],
     down: ["KeyS"],
     jump: ["KeyW"],
-    confirm: [],
+    confirm: ["KeyE"],
     pause: ["Escape"],
     mute: ["KeyM"],
   },

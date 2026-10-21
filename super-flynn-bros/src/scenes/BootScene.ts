@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import type { InputManager } from "@web-games/input";
 import { catalog, heroList } from "../engine/catalog";
 import { makeSpriteSheet } from "../engine/pixelArt";
+import { nextAttempts } from "../engine/assets";
 import { buildTileset } from "../engine/tileset";
 import { GameAudio } from "../engine/audio";
 import { phaserAudioBackend } from "../engine/phaserAudio";
@@ -19,8 +20,8 @@ export interface BootData {
   progress: Progress;
   /** Custom PNGs that exist: key → url. */
   overrides: Map<string, string>;
-  /** Sound and music files that exist: cache key → url. */
-  audioFiles: Map<string, string>;
+  /** Sound and music files that exist: cache key → urls (.mp3 first, then .ogg). */
+  audioFiles: Map<string, string[]>;
   /** From ?level=2&mode=coop: skip the title screen. */
   quickStart: { mode: GameMode; levelIndex: number } | null;
 }
@@ -36,13 +37,35 @@ export class BootScene extends Phaser.Scene {
   preload(): void {
     this.boot = this.registry.get("boot") as BootData;
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
-      console.info(`Couldn't load ${file.src}, so the game will skip it.`);
+      console.info(`Couldn't load ${file.src}.`);
     });
     for (const [key, url] of this.boot.overrides) this.load.image(key, url);
-    for (const [key, url] of this.boot.audioFiles) this.load.audio(key, url);
+    for (const [key, urls] of this.boot.audioFiles) this.load.audio(key, urls[0]);
   }
 
   create(): void {
+    this.retryBrokenSounds(new Map([...this.boot.audioFiles].map(([key, urls]) => [key, urls.slice(1)])));
+  }
+
+  /**
+   * If a sound file was broken (say jump.mp3 won't play), load the next one
+   * with the same name (jump.ogg), round after round, then finish setting up.
+   */
+  private retryBrokenSounds(backups: Map<string, string[]>): void {
+    const { attempts, remaining } = nextAttempts(backups, (key) => this.cache.audio.exists(key));
+    if (attempts.length === 0) {
+      this.finishBoot();
+      return;
+    }
+    for (const [key, url] of attempts) {
+      console.info(`Trying ${url} instead.`);
+      this.load.audio(key, url);
+    }
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => this.retryBrokenSounds(remaining));
+    this.load.start();
+  }
+
+  private finishBoot(): void {
     const warn = (message: string) => console.warn(message);
     const artSizes = new Map<string, Size>();
     for (const hero of heroList) {
