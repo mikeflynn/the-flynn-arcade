@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "lib/*",
-    "super-flynn-bros"
+    "super-flynn-bros",
+    "arcade"
   ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
