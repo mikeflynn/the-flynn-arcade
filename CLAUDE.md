@@ -225,9 +225,11 @@ At minimum, include:
    `README.md`. Keep the root README's fun, kid-friendly tone.
 8. Sanity-check tweakability: change a setting and swap the hero image, and
    confirm both work with hot reload.
-9. Join the arcade (§10): add `<game-name>/arcade.ts`, a `location` block in
-   `arcade/nginx.conf`, the game to the `arcade` service's `depends_on`, and
-   a "BACK TO ARCADE" / "QUIT TO ARCADE" option using `arcadeUrl()`.
+9. Join the arcade (§10): add `<game-name>/arcade.ts` (and `src/vite-env.d.ts`
+   so `import.meta.env.DEV` type-checks), copy the `super-flynn-bros` pair of
+   `location` blocks in `arcade/nginx.conf` with the new name in all four
+   places, add the game to the `arcade` service's `depends_on`, and add a
+   "BACK TO ARCADE" / "QUIT TO ARCADE" option using `arcadeUrl()`.
 10. Verify `docker compose up --build` works: the game on its own port, and
     through the arcade at `http://localhost:8000/<game-name>/`.
 

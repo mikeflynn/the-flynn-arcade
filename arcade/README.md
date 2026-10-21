@@ -93,6 +93,14 @@ put a file back, ask a grown-up to run `git checkout -- arcade/src/settings.ts`
 - **Adding a game:** see `CLAUDE.md` §9 and §10. In short, add
   `<game>/arcade.ts`, a `location` block in [`nginx.conf`](nginx.conf), and the
   game to the `arcade` service's `depends_on` in `docker-compose.yml`.
+- **A broken `arcade.ts`:** in dev, a game whose `arcade.ts` won't load (say, a
+  missing comma in its screen art) is left out with a console message, and
+  Vite's error overlay points at the typo (Esc closes it). A *syntax* error
+  still stops `npm run build -w arcade` (and so the Docker build), because the
+  build reads every `arcade.ts`. Fix the typo, or move the file aside, to build.
+- **Docker routing:** nginx looks up each game's container on every request
+  (`resolver 127.0.0.11`), so rebuilding or stopping one game never breaks the
+  arcade. A stopped game just shows 502 on its own page.
 - `?debug=1` exposes the Phaser game as `game` in the console.
 - Mute is saved in `localStorage` under `flynn-arcade:settings`.
 - Shared libraries used: `lib/input`, `lib/pixel-art`, `lib/audio`,

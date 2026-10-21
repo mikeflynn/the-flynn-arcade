@@ -3,7 +3,7 @@ import { fromGameId } from "@web-games/arcade";
 import { audioCandidates, findAllAssets, makeHttpExists } from "@web-games/audio";
 import { InputManager } from "@web-games/input";
 import { arcadeControls, secondPadControls } from "./controls";
-import { games } from "./games";
+import { loadGames } from "./games";
 import { musicTracks, soundEffects } from "./sounds";
 import { loadArcadeSettings } from "./storage";
 import { ArcadeScene, type ArcadeBoot } from "./scene/ArcadeScene";
@@ -23,7 +23,7 @@ async function start(): Promise<void> {
 
   const boot: ArcadeBoot = {
     input,
-    games,
+    games: await loadGames(),
     audioFiles: await findAllAssets(audioCandidates(soundEffects, musicTracks), makeHttpExists()),
     fromId: fromGameId(window.location.search),
     muted: loadArcadeSettings().muted,

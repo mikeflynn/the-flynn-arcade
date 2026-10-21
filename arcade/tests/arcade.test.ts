@@ -8,7 +8,7 @@ import { cabinetArt } from "../src/cabinet";
 import { cabinetPalette, findRegion, shade } from "../src/layout";
 import { buildSlots, initialIndex, nextAttractIndex, wrap } from "../src/selection";
 import { loadArcadeSettings, saveArcadeSettings, type StorageLike } from "../src/storage";
-import { folderOf, games } from "../src/games";
+import { collectRegistrations, folderOf, loadGames } from "../src/games";
 import { playerBadges } from "../src/badges";
 
 const game = (id: string): GameInfo => ({
@@ -59,6 +59,11 @@ describe("selection", () => {
 
   it("adds coming-soon cabinets after the games", () => {
     expect(slots.map((s) => s.kind)).toEqual(["game", "game", "soon", "soon"]);
+  });
+
+  it("always has at least one cabinet, even with no games and no coming-soon cabinets", () => {
+    expect(buildSlots([], 0).map((s) => s.kind)).toEqual(["soon"]);
+    expect(buildSlots([game("a")], 0).map((s) => s.kind)).toEqual(["game"]);
   });
 
   it("wraps around both ends", () => {
@@ -116,8 +121,24 @@ describe("games.ts", () => {
     expect(folderOf("../../super-flynn-bros/arcade.ts")).toBe("super-flynn-bros");
   });
 
-  it("finds Super Flynn Bros", () => {
-    expect(games.map((g) => g.id)).toContain("super-flynn-bros");
+  it("finds Super Flynn Bros", async () => {
+    expect((await loadGames()).map((g) => g.id)).toContain("super-flynn-bros");
+  });
+
+  it("leaves out a game whose arcade.ts can't even be loaded, and says so", async () => {
+    const warn = vi.fn();
+    const registrations = await collectRegistrations(
+      [
+        ["../../good-game/arcade.ts", async () => ({ arcadeInfo: { id: "good-game" } })],
+        ["../../broken-game/arcade.ts", async () => Promise.reject(new SyntaxError("Unexpected string"))],
+        ["../../arcade/arcade.ts", async () => ({ arcadeInfo: {} })],
+      ],
+      warn,
+    );
+    expect(registrations).toEqual([{ folder: "good-game", info: { id: "good-game" } }]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain("broken-game/arcade.ts");
+    expect(warn.mock.calls[0][0]).toContain("Unexpected string");
   });
 });
 

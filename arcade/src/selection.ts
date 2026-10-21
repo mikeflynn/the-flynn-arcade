@@ -4,7 +4,9 @@ import type { GameInfo } from "@web-games/arcade";
 export type Slot = { kind: "game"; game: GameInfo } | { kind: "soon" };
 
 export function buildSlots(games: GameInfo[], comingSoon: number): Slot[] {
-  return [...games.map((game) => ({ kind: "game" as const, game })), ...Array.from({ length: comingSoon }, () => ({ kind: "soon" as const }))];
+  // With no games at all, show at least one "COMING SOON" cabinet so the arcade never has an empty row.
+  const soon = games.length === 0 ? Math.max(1, comingSoon) : comingSoon;
+  return [...games.map((game) => ({ kind: "game" as const, game })), ...Array.from({ length: soon }, () => ({ kind: "soon" as const }))];
 }
 
 /** Keeps an index inside 0..count-1, wrapping around at both ends. */
