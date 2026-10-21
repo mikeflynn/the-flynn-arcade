@@ -14,7 +14,7 @@
 //
 // "volume" goes from 0 (silent) to 1 (loudest).
 
-import type { SoundDef } from "./engine/audio";
+import type { SoundDef } from "@web-games/audio";
 
 export const soundEffects = {
   jump: { file: "jump", volume: 0.6 },

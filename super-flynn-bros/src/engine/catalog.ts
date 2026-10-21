@@ -2,7 +2,7 @@ import { heroes } from "../heroes";
 import { hazards } from "../hazards";
 import { items } from "../items";
 import { tiles } from "../tiles";
-import type { AssetCandidate } from "./assets";
+import type { AssetCandidate } from "@web-games/audio";
 import { checkHazard, checkHero } from "./checkDefs";
 import type { HeroDef } from "./types";
 import type { LevelCatalog } from "./levelLoader";

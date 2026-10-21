@@ -2,10 +2,8 @@ import Phaser from "phaser";
 import type { InputManager } from "@web-games/input";
 import { catalog, heroList } from "../engine/catalog";
 import { makeSpriteSheet } from "@web-games/pixel-art";
-import { nextAttempts } from "../engine/assets";
+import { GameAudio, loadSoundsWithBackups, phaserAudioBackend } from "@web-games/audio";
 import { buildTileset } from "../engine/tileset";
-import { GameAudio } from "../engine/audio";
-import { phaserAudioBackend } from "../engine/phaserAudio";
 import { setServices, useControls, type GameMode } from "../engine/services";
 import type { Progress } from "../engine/progress";
 import type { Size } from "../engine/types";
@@ -40,29 +38,11 @@ export class BootScene extends Phaser.Scene {
       console.info(`Couldn't load ${file.src}.`);
     });
     for (const [key, url] of this.boot.overrides) this.load.image(key, url);
-    for (const [key, urls] of this.boot.audioFiles) this.load.audio(key, urls[0]);
   }
 
   create(): void {
-    this.retryBrokenSounds(new Map([...this.boot.audioFiles].map(([key, urls]) => [key, urls.slice(1)])));
-  }
-
-  /**
-   * If a sound file was broken (say jump.mp3 won't play), load the next one
-   * with the same name (jump.ogg), round after round, then finish setting up.
-   */
-  private retryBrokenSounds(backups: Map<string, string[]>): void {
-    const { attempts, remaining } = nextAttempts(backups, (key) => this.cache.audio.exists(key));
-    if (attempts.length === 0) {
-      this.finishBoot();
-      return;
-    }
-    for (const [key, url] of attempts) {
-      console.info(`Trying ${url} instead.`);
-      this.load.audio(key, url);
-    }
-    this.load.once(Phaser.Loader.Events.COMPLETE, () => this.retryBrokenSounds(remaining));
-    this.load.start();
+    // Sounds load after the pictures, with backups: a broken jump.mp3 falls back to jump.ogg.
+    loadSoundsWithBackups(this, this.boot.audioFiles, () => this.finishBoot());
   }
 
   private finishBoot(): void {

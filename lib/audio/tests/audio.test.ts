@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { audioCandidates, GameAudio, type AudioBackend, type GameAudioOptions } from "../src/engine/audio";
+import { audioCandidates, GameAudio, type AudioBackend, type GameAudioOptions } from "../src/audio";
 
 interface Played {
   key: string;

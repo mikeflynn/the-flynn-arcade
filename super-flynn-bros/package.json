@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@web-games/audio": "*",
     "@web-games/input": "*",
     "@web-games/pixel-art": "*",
     "@web-games/settings": "*",

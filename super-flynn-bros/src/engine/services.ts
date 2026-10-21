@@ -1,6 +1,6 @@
 import { mergeBindings, type InputManager } from "@web-games/input";
 import { player1Controls, player2Controls } from "../controls";
-import type { GameAudio } from "./audio";
+import type { GameAudio } from "@web-games/audio";
 import { saveProgress, unlockLevel, type Progress } from "./progress";
 import type { Tileset } from "./tileset";
 import type { Size } from "./types";

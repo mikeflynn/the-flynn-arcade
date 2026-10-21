@@ -1,7 +1,6 @@
 import Phaser from "phaser";
 import { InputManager } from "@web-games/input";
-import { findAllAssets, findAssets, makeHttpExists } from "./engine/assets";
-import { audioCandidates } from "./engine/audio";
+import { audioCandidates, findAllAssets, findAssets, makeHttpExists } from "@web-games/audio";
 import { spriteOverrideCandidates } from "./engine/catalog";
 import { loadProgress } from "./engine/progress";
 import { globalStep, type GameMode } from "./engine/services";

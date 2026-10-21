@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findAllAssets, findAssets, makeHttpExists, nextAttempts } from "../src/engine/assets";
+import { findAllAssets, findAssets, makeHttpExists, nextAttempts } from "../src/assets";
 
 describe("findAssets", () => {
   it("picks the first address that exists and leaves out missing files", async () => {
