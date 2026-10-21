@@ -17,3 +17,14 @@ services:
     ports:
       - "8001:80"
     restart: unless-stopped
+
+  # The front door: http://localhost:8000 (forwards /<game-id>/ to each game).
+  arcade:
+    build:
+      context: .
+      dockerfile: arcade/Dockerfile
+    ports:
+      - "8000:80"
+    depends_on:
+      - super-flynn-bros
+    restart: unless-stopped

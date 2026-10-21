@@ -45,16 +45,18 @@ You'll need a grown-up for this part the first time.
 ```bash
 docker compose up --build
 ```
-Then open the game's address in your browser. Each game's README says which
-one, like `http://localhost:8001`.
+Then open **http://localhost:8000**: that's the arcade! 🕹️ Walk along the
+cabinets with ◀ ▶, and press Start (Enter or Space) to play. Every game has a
+"BACK TO ARCADE" option to come back.
 
 **The tinkering way (live editing):**
 ```bash
 npm install
-npm run dev -w <game-name>
+npm run dev -w arcade            # the arcade, at http://localhost:8000
+npm run dev -w <game-name>       # in another terminal: the game you're changing
 ```
-Open the address it prints. Now every time you save a change, the game
-updates right in front of you. ✨
+Now every time you save a change, the game updates right in front of you. ✨
+(You can also open a game's own address directly, like `http://localhost:8001`.)
 
 ---
 
@@ -87,6 +89,7 @@ Quick overview:
 - **Each game** lives in its own folder at the top level
 - **`server/`** is one shared multiplayer server for two-player games
 - **`lib/`** holds shared helpers like gamepad support and networking
+- **`arcade/`** is the game picker everyone starts from, at port 8000
 - **`docker-compose.yml`** runs the whole arcade
 
 ---

@@ -21,18 +21,23 @@ the-flynn-arcade/
 ├── CLAUDE.md              # This file — global rules (source of truth)
 ├── README.md              # Kid-friendly arcade front page + games table
 ├── docker-compose.yml     # Master compose file: one service per game + server
-├── package.json           # npm workspaces root (games, lib/*, server)
+├── package.json           # npm workspaces root (games, arcade, lib/*, server)
+├── arcade/                # The Flynn Arcade: the game picker everyone starts from (port 8000)
 ├── server/                # Universal multiplayer server (only if a game needs it)
 ├── lib/                   # Shared libraries, one package per subdirectory
-│   ├── net/               #   e.g. client for the multiplayer server
-│   └── input/             #   e.g. keyboard / gamepad / touch abstraction
+│   ├── input/             #   keyboard + gamepad actions per player
+│   ├── pixel-art/         #   text-grid pixel art → Phaser textures
+│   ├── audio/             #   optional sounds/music, skipped when missing
+│   ├── settings/          #   clamp kid-edited numbers into safe ranges
+│   └── arcade/            #   GameInfo + links between the arcade and games
 └── <game-name>/           # One directory per game, at the repo root
+    └── arcade.ts          #   how the game shows up in the arcade (§10)
 ```
 
 - Each game lives in its own **kebab-case** directory at the repo root
   (e.g. `space-pong/`, `tic-tac-toe/`).
-- Reserved root directory names (never use for a game): `server`, `lib`,
-  `docs`, `scripts`, `node_modules`.
+- Reserved root directory names (never use for a game): `arcade`, `server`,
+  `lib`, `docs`, `scripts`, `node_modules`.
 - Games must not import from other games. Anything shared goes in `lib/`.
 
 ## 2. Stack (all games)
@@ -93,6 +98,7 @@ Each game's `README.md` must include:
 
 | Service  | Host port | Notes                         |
 | -------- | --------- | ----------------------------- |
+| arcade   | 8000      | The Flynn Arcade game picker (front door) |
 | server   | 3000      | Multiplayer WebSocket server (reserved) |
 | super-flynn-bros | 8001 | 8-bit side scroller (1–2 players, local) |
 | _(next game)_ | 8002 | Games get 8001, 8002, … in order |
@@ -133,11 +139,15 @@ rather than special-casing one game in the core.
 - Each library is its own npm workspace package: `lib/<name>/` with
   `package.json` name `@web-games/<name>`.
 - Games depend on it via `"@web-games/<name>": "*"` in their `package.json`.
+- Current libraries:
+  - `lib/input` — keyboard + gamepad (Gamepad API) actions per player
+  - `lib/pixel-art` — text-grid pixel art, PNG overrides
+  - `lib/audio` — optional sounds and music, quiet when files are missing
+  - `lib/settings` — `clampSettings` for kid-edited numbers
+  - `lib/arcade` — `GameInfo`, validation, arcade ↔ game URLs
 - Candidates (create when first needed, not ahead of time):
   - `lib/net` — multiplayer client (connect, rooms, send/receive, reconnect)
-  - `lib/input` — unified keyboard / gamepad (Gamepad API) / touch input
-  - `lib/ui` — shared menus, lobby screen, room-code entry, settings
-  - `lib/audio` — volume / mute persistence
+  - `lib/ui` — shared menus, lobby screen, room-code entry
 - Promote code into `lib/` once a second game needs it; don't build speculative
   abstractions.
 - Libraries must not depend on any specific game.
@@ -215,13 +225,38 @@ At minimum, include:
    `README.md`. Keep the root README's fun, kid-friendly tone.
 8. Sanity-check tweakability: change a setting and swap the hero image, and
    confirm both work with hot reload.
-9. Verify `docker compose up --build <game-name>` works.
+9. Join the arcade (§10): add `<game-name>/arcade.ts`, a `location` block in
+   `arcade/nginx.conf`, the game to the `arcade` service's `depends_on`, and
+   a "BACK TO ARCADE" / "QUIT TO ARCADE" option using `arcadeUrl()`.
+10. Verify `docker compose up --build` works: the game on its own port, and
+    through the arcade at `http://localhost:8000/<game-name>/`.
+
+## 10. The Arcade (`arcade/`)
+
+The arcade is the front door: kids open `http://localhost:8000` and pick a
+game cabinet. It's a Vite + Phaser app like the games.
+
+- **Joining:** each game exports `arcadeInfo: GameInfo` (from
+  `@web-games/arcade`) in `<game-name>/arcade.ts`: `id` (= folder name),
+  `title`, `blurb`, `players`, cabinet `colors`, `devPort`, optional `order`,
+  and a `screenArt` text picture (up to 32 × 24). The arcade finds every
+  `*/arcade.ts` automatically at build time. Never edit arcade code to add a game.
+- **Routing:** in Docker the arcade serves `/` and its nginx forwards
+  `/<game-name>/` to the game's container. In dev the arcade links to the
+  game's own dev server (`devPort`). Games are built with `base: "./"` so they
+  work under a path.
+- **Going back:** games link back with `arcadeUrl("<game-name>", { dev:
+  import.meta.env.DEV })`, which reopens the arcade on that game's cabinet.
 
 ---
 
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-21 — Added **The Flynn Arcade** launcher (`arcade/`, port 8000) and
+  §10. Games join with `<game>/arcade.ts`. Promoted shared code into
+  `lib/pixel-art`, `lib/audio`, `lib/settings`; added `lib/arcade`.
 
 - 2026-10-18 — First game: Super Flynn Bros on port 8001. Added the root
   npm workspace (`package.json`, `tsconfig.base.json`) and the first shared
