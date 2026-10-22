@@ -93,13 +93,19 @@ Each game's `README.md` must include:
   set `dockerfile: <game-name>/Dockerfile`.
 - Games that need the multiplayer server declare `depends_on: [server]`.
 - The `server` service is only added once the first game needs it.
+- **Images are built by GitHub Actions, never on the server.**
+  `.github/workflows/images.yml` tests, then builds every service for
+  amd64 + arm64 and publishes `ghcr.io/mikeflynn/the-flynn-arcade/<service>`
+  (`:latest` and `:<commit sha>`) on each push to `main`. Dockerfiles run their
+  Node build stage on `--platform=$BUILDPLATFORM` so it only runs once.
 - **Production:** `docker-compose.prod.yml` is layered on top for a real web
-  server whose own Caddy (installed on the host) handles HTTPS. It binds the
-  arcade to `127.0.0.1:${ARCADE_PORT:-8000}` and hides every other service's
-  ports with `ports: !reset []`. **Every new service needs that
-  `ports: !reset []` entry there too**, so only the arcade is reachable.
-  The Caddy site block is `deploy/Caddyfile.example`; deploy steps are in the
-  root `README.md`.
+  server whose own Caddy (installed on the host) handles HTTPS. It runs the
+  published images (`build: !reset null`, `pull_policy: always`), binds the
+  arcade to `127.0.0.1:${ARCADE_PORT:-8000}`, and hides every other service's
+  ports with `ports: !reset []`. **Every new service needs a matching block
+  there** (copy the `super-flynn-bros` one), so it runs the published image
+  and only the arcade is reachable. The Caddy site block is
+  `deploy/Caddyfile.example`; deploy steps are in the root `README.md`.
 
 ### Port Registry
 
@@ -223,8 +229,11 @@ At minimum, include:
    `src/settings.ts` and assets in `public/assets/` (§7).
 2. Add it to root `package.json` workspaces (if not covered by a glob).
 3. Assign the next free port in the §4 registry.
-4. Add its service to `docker-compose.yml`, and a `ports: !reset []` entry for
-   it in `docker-compose.prod.yml` (§4).
+4. Add its service to `docker-compose.yml`; copy the `super-flynn-bros` block
+   in `docker-compose.prod.yml` for it (image, `build: !reset null`,
+   `pull_policy`, `ports: !reset []`); and add its folder name to the
+   `service` matrix in `.github/workflows/images.yml` (§4). Its Dockerfile's
+   build stage uses `FROM --platform=$BUILDPLATFORM node:22-alpine`.
 5. If it's multiplayer: ensure the `server` service exists, use `lib/net`,
    and add a server handler only if relay mode isn't enough.
 6. Write the game's `README.md`, including "How It Works" and "Make It Your
@@ -263,6 +272,12 @@ game cabinet. It's a Vite + Phaser app like the games.
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-22 — Images are built and published by GitHub Actions
+  (`.github/workflows/images.yml`, ghcr.io, amd64 + arm64); the server only
+  pulls them. New services join the workflow matrix and get an image block in
+  `docker-compose.prod.yml`. (Building on a small server ran it out of memory:
+  each Vite build needs about 1 GB.)
 
 - 2026-10-22 — Production deploy: `docker-compose.prod.yml` puts the arcade
   on `127.0.0.1` behind the server's own Caddy (site block in

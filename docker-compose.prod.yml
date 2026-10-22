@@ -1,9 +1,12 @@
 # Production add-on for a web server that already runs Caddy (or another web
 # server) on the host. Use it together with the main file:
 #
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # What it changes:
+#   - Nothing is built on the server. Every service runs the finished image
+#     that GitHub Actions publishes to ghcr.io on each push to main (see
+#     .github/workflows/images.yml), and "up" always fetches the newest one.
 #   - The arcade listens on 127.0.0.1 only (port 8000 by default), so just the
 #     server itself (your Caddy) can reach it, not the whole internet.
 #   - The games' own ports are hidden. Visitors reach every game through the
@@ -14,14 +17,20 @@
 #       reverse_proxy localhost:8000
 #   }
 #
-# To use a different port, set ARCADE_PORT in a .env file (see .env.example).
+# Optional settings go in a .env file (see .env.example).
 # Needs Docker Compose 2.24 or newer (for "!override" and "!reset").
 
 services:
   arcade:
+    image: ${IMAGE_PREFIX:-ghcr.io/mikeflynn/the-flynn-arcade}/arcade:${IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
     ports: !override
       - "127.0.0.1:${ARCADE_PORT:-8000}:80"
 
-  # When you add a game, give it the same "ports: !reset []" block here.
+  # When you add a game, give it a block just like this one.
   super-flynn-bros:
+    image: ${IMAGE_PREFIX:-ghcr.io/mikeflynn/the-flynn-arcade}/super-flynn-bros:${IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
     ports: !reset []

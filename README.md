@@ -94,11 +94,15 @@ Quick overview:
 
 ### 🌐 Putting the arcade on the internet
 
-The arcade runs on any Linux server with Docker (2 GB of memory is
-comfortable, since it builds the games on the server), behind the
+The arcade runs on any Linux server with Docker, behind the
 [Caddy](https://caddyserver.com) web server already running on that server.
 Caddy handles HTTPS. That matters, because browsers only allow gamepads on
 secure pages.
+
+The server never builds anything. Every push to `main` makes GitHub Actions
+test the code, build the arcade and every game into Docker images, and publish
+them to GitHub's container registry ([`.github/workflows/images.yml`](.github/workflows/images.yml)).
+The server just downloads the finished images, so a small server is plenty.
 
 1. Point your domain's DNS (an `A` record, like `arcade.yourdomain.com`) at the
    server.
@@ -106,7 +110,7 @@ secure pages.
    ```bash
    git clone https://github.com/mikeflynn/the-flynn-arcade.git
    cd the-flynn-arcade
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
    ```
    It listens on `127.0.0.1:8000`, so only Caddy can reach it. (Port 8000
    taken? Copy `.env.example` to `.env` and change `ARCADE_PORT`.)
@@ -121,13 +125,18 @@ secure pages.
    Then `sudo systemctl reload caddy`.
 4. Open `https://arcade.yourdomain.com`. 🎉
 
-**To update** after pushing new changes:
+**To update** after pushing new changes, wait for the "Images" run to go
+green on GitHub's **Actions** tab, then on the server:
 ```bash
-git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
+(`git pull` picks up any changes to the compose files; `up -d` downloads the
+newest images and restarts only what changed. To roll back, set `IMAGE_TAG` in
+`.env` to an earlier commit's full SHA.)
 
 How it fits together: [`docker-compose.prod.yml`](docker-compose.prod.yml)
-keeps the arcade on `127.0.0.1` and hides every game's own port, so visitors
+runs the published images, keeps the arcade on `127.0.0.1`, and hides every
+game's own port, so visitors
 only reach the arcade (through Caddy), which forwards `/<game-name>/` to each
 game. Everything restarts on its own after a reboot. It needs Docker Compose
 2.24 or newer.
