@@ -1,0 +1,11 @@
+# Add this site block to the Caddyfile your server's Caddy already uses
+# (often /etc/caddy/Caddyfile), change the domain, then reload Caddy:
+#   sudo systemctl reload caddy
+#
+# Caddy gets the HTTPS certificate for the domain automatically. HTTPS matters:
+# browsers only allow gamepads on secure pages.
+
+arcade.yourdomain.com {
+	encode zstd gzip
+	reverse_proxy localhost:8000
+}

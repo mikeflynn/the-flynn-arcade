@@ -1,8 +1,0 @@
-# Caddy: the web server facing the internet. It gets an HTTPS certificate for
-# ARCADE_DOMAIN automatically and hands every request to the arcade, which
-# serves the game picker and forwards /<game-id>/ to each game.
-# (HTTPS matters: browsers only allow gamepads on secure pages.)
-{$ARCADE_DOMAIN} {
-	encode zstd gzip
-	reverse_proxy arcade:80
-}

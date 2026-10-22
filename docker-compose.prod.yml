@@ -1,43 +1,27 @@
-# Production add-on for a real web server. Use it together with the main file:
+# Production add-on for a web server that already runs Caddy (or another web
+# server) on the host. Use it together with the main file:
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # What it changes:
-#   - Adds Caddy, which answers on ports 80/443 and gets HTTPS certificates
-#     for your domain automatically (from Let's Encrypt).
-#   - Hides the arcade's and games' own ports, so the only way in is through
-#     Caddy → the arcade (which already forwards /<game-id>/ to each game).
+#   - The arcade listens on 127.0.0.1 only (port 8000 by default), so just the
+#     server itself (your Caddy) can reach it, not the whole internet.
+#   - The games' own ports are hidden. Visitors reach every game through the
+#     arcade, which forwards /<game-id>/ to each game's container.
 #
-# Your domain comes from a .env file next to this one (see .env.example):
-#   ARCADE_DOMAIN=arcade.yourdomain.com
+# Then point your Caddy at it (see deploy/Caddyfile.example):
+#   arcade.yourdomain.com {
+#       reverse_proxy localhost:8000
+#   }
 #
-# Needs Docker Compose 2.24 or newer (for "!reset").
+# To use a different port, set ARCADE_PORT in a .env file (see .env.example).
+# Needs Docker Compose 2.24 or newer (for "!override" and "!reset").
 
 services:
-  caddy:
-    image: caddy:2.8-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp" # HTTP/3
-    environment:
-      ARCADE_DOMAIN: ${ARCADE_DOMAIN:?Set ARCADE_DOMAIN in .env (see .env.example)}
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data # certificates live here; keep it so they survive restarts
-      - caddy_config:/config
-    depends_on:
-      - arcade
-    restart: unless-stopped
-
-  # Only Caddy talks to these now. When you add a game, give it the same
-  # "ports: !reset []" block here.
   arcade:
-    ports: !reset []
+    ports: !override
+      - "127.0.0.1:${ARCADE_PORT:-8000}:80"
 
+  # When you add a game, give it the same "ports: !reset []" block here.
   super-flynn-bros:
     ports: !reset []
-
-volumes:
-  caddy_data:
-  caddy_config:

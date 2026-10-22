@@ -94,10 +94,12 @@ Each game's `README.md` must include:
 - Games that need the multiplayer server declare `depends_on: [server]`.
 - The `server` service is only added once the first game needs it.
 - **Production:** `docker-compose.prod.yml` is layered on top for a real web
-  server. It adds Caddy (HTTPS, `deploy/Caddyfile`) on 80/443 and hides every
-  other service's ports with `ports: !reset []`. **Every new service needs that
+  server whose own Caddy (installed on the host) handles HTTPS. It binds the
+  arcade to `127.0.0.1:${ARCADE_PORT:-8000}` and hides every other service's
+  ports with `ports: !reset []`. **Every new service needs that
   `ports: !reset []` entry there too**, so only the arcade is reachable.
-  Deploy steps are in the root `README.md`.
+  The Caddy site block is `deploy/Caddyfile.example`; deploy steps are in the
+  root `README.md`.
 
 ### Port Registry
 
@@ -262,9 +264,10 @@ game cabinet. It's a Vite + Phaser app like the games.
 
 Record every change to these guidelines (newest first).
 
-- 2026-10-22 — Production deploy: `docker-compose.prod.yml` + Caddy
-  (`deploy/`) for HTTPS on a real server; new services must hide their ports
-  there. `deploy` is now a reserved directory name.
+- 2026-10-22 — Production deploy: `docker-compose.prod.yml` puts the arcade
+  on `127.0.0.1` behind the server's own Caddy (site block in
+  `deploy/Caddyfile.example`); new services must hide their ports there.
+  `deploy` is now a reserved directory name.
 
 - 2026-10-21 — Added **The Flynn Arcade** launcher (`arcade/`, port 8000) and
   §10. Games join with `<game>/arcade.ts`. Promoted shared code into
