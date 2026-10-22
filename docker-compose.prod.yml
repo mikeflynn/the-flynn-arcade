@@ -13,7 +13,7 @@
 #     arcade, which forwards /<game-id>/ to each game's container.
 #
 # Then point your Caddy at it (see deploy/Caddyfile.example):
-#   arcade.yourdomain.com {
+#   arcade.flynn.link {
 #       reverse_proxy localhost:8000
 #   }
 #

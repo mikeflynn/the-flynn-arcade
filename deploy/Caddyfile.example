@@ -5,7 +5,7 @@
 # Caddy gets the HTTPS certificate for the domain automatically. HTTPS matters:
 # browsers only allow gamepads on secure pages.
 
-arcade.yourdomain.com {
+arcade.flynn.link {
 	encode zstd gzip
 	reverse_proxy localhost:8000
 }

@@ -104,7 +104,7 @@ test the code, build the arcade and every game into Docker images, and publish
 them to GitHub's container registry ([`.github/workflows/images.yml`](.github/workflows/images.yml)).
 The server just downloads the finished images, so a small server is plenty.
 
-1. Point your domain's DNS (an `A` record, like `arcade.yourdomain.com`) at the
+1. Point your domain's DNS (an `A` record, like `arcade.flynn.link`) at the
    server.
 2. On the server, start the arcade:
    ```bash
@@ -117,13 +117,13 @@ The server just downloads the finished images, so a small server is plenty.
 3. Add the site block from [`deploy/Caddyfile.example`](deploy/Caddyfile.example)
    to your Caddyfile (often `/etc/caddy/Caddyfile`), with your domain:
    ```
-   arcade.yourdomain.com {
+   arcade.flynn.link {
    	encode zstd gzip
    	reverse_proxy localhost:8000
    }
    ```
    Then `sudo systemctl reload caddy`.
-4. Open `https://arcade.yourdomain.com`. 🎉
+4. Open `https://arcade.flynn.link`. 🎉
 
 **To update** after pushing new changes, wait for the "Images" run to go
 green on GitHub's **Actions** tab, then on the server:
