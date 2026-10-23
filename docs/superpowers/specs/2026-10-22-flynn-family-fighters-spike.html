@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fighter Spike v2</title>
+<style>
+  body { margin: 0; background: #14142a; color: #eee; font: 14px/1.4 system-ui, sans-serif; }
+  #wrap { max-width: 1240px; margin: 0 auto; padding: 12px 16px; display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+  #game { width: 100%; aspect-ratio: 16/9; }
+  h1 { font-size: 16px; margin: 0 0 8px; color: #f6d860; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; align-items: center; }
+  button { background: #2a5cff; color: #fff; border: 0; border-radius: 6px; padding: 6px 10px; font-weight: 600; cursor: pointer; }
+  button.alt { background: #8a2be2; }
+  kbd { background: #333; border-radius: 3px; padding: 0 4px; }
+  textarea { width: 100%; height: 340px; background: #0b0b18; color: #9fe; border: 1px solid #444; font: 12px ui-monospace, monospace; box-sizing: border-box; }
+  #err { color: #ff8080; }
+  label { display: inline-flex; gap: 4px; align-items: center; margin-right: 10px; }
+  a { color: #9cf; }
+  @media (max-width: 900px) { #wrap { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div>
+    <div id="game"></div>
+    <div class="row">
+      <button data-a="punch">Punch <kbd>U</kbd></button>
+      <button data-a="kick">Kick <kbd>J</kbd></button>
+      <button data-a="special">Special <kbd>I</kbd></button>
+      <button data-a="hit">Get hit <kbd>H</kbd></button>
+      <button data-a="dizzy">Dizzy <kbd>Z</kbd></button>
+      <button data-a="win">Win <kbd>W</kbd></button>
+      <span>Walk: <kbd>←</kbd> <kbd>→</kbd></span>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="pixel" checked> Arcade pixel filter</label>
+      <label><input type="checkbox" id="bones"> Show bones</label>
+      <label><input type="checkbox" id="slow"> Slow motion</label>
+      <label><input type="checkbox" id="cpu" checked> Ryan fights back</label>
+      <a href="v1.html">← compare with v1</a>
+    </div>
+  </div>
+  <div>
+    <h1>Character file (edit &amp; apply)</h1>
+    <div class="row">
+      <button class="alt" id="whoC">Edit Colin</button>
+      <button class="alt" id="whoR">Edit Ryan</button>
+      <button id="rand">Random</button>
+    </div>
+    <textarea id="look" spellcheck="false"></textarea>
+    <div class="row"><button id="apply">Apply</button><span id="err"></span></div>
+    <p style="opacity:.7">archetype: martial, brawler · hair: swoop, short, spiky, long, buzz ·
+    extras: headband, cap · face: determined, grin · build: lean, medium, big · muscle 0.8–1.4 · height 0.85–1.15</p>
+  </div>
+</div>
+<script src="phaser.min.js"></script>
+<script>
+// ===== THROWAWAY SPIKE v2: SF2-style paper-doll fighters =====
+const OUT = 0x1a1424, PAD = 12, GROUND = 488;
+const hex = (s) => parseInt(String(s).replace('#', ''), 16) || 0;
+const mix = (c, t, f) => { const ch = (v, s) => Math.round(((v >> s) & 255) * (1 - f) + ((t >> s) & 255) * f); return (ch(c, 16) << 16) | (ch(c, 8) << 8) | ch(c, 0); };
+const dark = (c, f = 0.3) => mix(c, 0x1a1030, f), light = (c, f = 0.3) => mix(c, 0xffffff, f);
+const clampN = (v, lo, hi, d) => { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
+
+const LOOKS = {
+  colin: { name: 'COLIN', archetype: 'martial', height: 1.08, build: 'lean', muscle: 1.15,
+    skin: '#f1c08f', eyes: '#3b6fb6', face: 'determined', hair: { style: 'swoop', color: '#f7d35c' },
+    top: '#2f6fd6', bottom: '#2f6fd6', belt: '#1d1d1d', shoes: '#ffffff', extras: ['headband'], accent: '#e8e8e8',
+    special: { name: 'DONUT BLAST', color: '#ff7ad9' } },
+  ryan: { name: 'RYAN', archetype: 'brawler', height: 0.93, build: 'medium', muscle: 1.1,
+    skin: '#f1c08f', eyes: '#6b4423', face: 'grin', hair: { style: 'short', color: '#6e4022' },
+    top: '#3fae5a', bottom: '#35558f', belt: '#6b3d1e', shoes: '#e04848', extras: ['cap'], accent: '#e04848',
+    special: { name: 'FASTBALL', color: '#7dff6a' } },
+};
+
+// ---------- polygon helpers: every shape is a polygon, so we can cel-shade by clipping ----------
+const pts = (a) => a.map(([x, y]) => ({ x, y }));
+const ell = (x, y, w, h, n = 22) => Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2; return { x: x + Math.cos(a) * w / 2, y: y + Math.sin(a) * h / 2 }; });
+function clip(poly, nx, ny, d) {   // keep the part where nx*x + ny*y <= d
+  const out = [];
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i], B = poly[(i + 1) % poly.length], da = nx * A.x + ny * A.y - d, db = nx * B.x + ny * B.y - d;
+    if (da <= 0) out.push(A);
+    if ((da <= 0) !== (db <= 0)) { const t = da / (da - db); out.push({ x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }); }
+  }
+  return out;
+}
+// Draw layers: 1) thick outline for every outlined layer, 2) fills with shadow / highlight bands, 3) detail lines.
+function paint(g, layers, lines = []) {
+  for (const L of layers) if (L.outline !== false) { g.fillStyle(OUT); g.fillPoints(L.p, true); g.lineStyle(7, OUT); g.strokePoints(L.p, true, true); }
+  for (const L of layers) {
+    if (L.ink) { g.lineStyle(3, OUT); }
+    g.fillStyle(L.c); g.fillPoints(L.p, true);
+    const sx = L.shade ?? null;
+    if (sx !== null) { const s = clip(L.p, 1, L.tilt ?? 0, sx); if (s.length > 2) { g.fillStyle(dark(L.c, 0.32)); g.fillPoints(s, true); }
+      const s2 = clip(L.p, 1, L.tilt ?? 0, sx - (L.deep ?? 9)); if (s2.length > 2) { g.fillStyle(dark(L.c, 0.52)); g.fillPoints(s2, true); } }
+    if (L.hi !== undefined) { const h = clip(L.p, -1, 0, -L.hi); if (h.length > 2) { g.fillStyle(light(L.c, 0.32)); g.fillPoints(h, true); } }
+    if (L.ink) g.strokePoints(L.p, true, true);
+  }
+  for (const l of lines) { g.lineStyle(l.w ?? 3, l.c ?? OUT); g.strokePoints(pts(l.p), false); }
+}
+
+// ---------- body measurements ----------
+function dims(L) {
+  const k = clampN(L.height, 0.85, 1.15, 1), m = clampN(L.muscle, 0.8, 1.4, 1);
+  const b = { lean: 0.92, medium: 1, big: 1.18 }[L.build] || 1;
+  return { k, b, m, w: b * m, chestH: 70 * k, S: 52 * b * m, Lt: 40 * b * m, Wb: 27 * b, waistH: 38 * k,
+    uaL: 60 * k, faL: 54 * k, thighL: 80 * k, shinL: 78 * k, f: 1.12 * Math.sqrt(b * m) };
+}
+
+function skeleton(d) {
+  return [
+    { n: 'bUA', p: 'chest', at: { x: -d.S * 0.6, y: -d.chestH * 0.8 }, tex: 'ua', back: 1 },
+    { n: 'bFA', p: 'bUA', at: { x: 0, y: d.uaL - 6 }, tex: 'fa', back: 1 },
+    { n: 'bH', p: 'bFA', at: { x: 0, y: d.faL - 4 }, tex: 'fist', back: 1 },
+    { n: 'bFt', p: 'bSh', at: { x: 0, y: d.shinL - 10 }, tex: 'foot', back: 1 },
+    { n: 'bTh', p: 'hips', at: { x: -12 * d.b, y: 16 }, tex: 'thigh', back: 1 },
+    { n: 'bSh', p: 'bTh', at: { x: 0, y: d.thighL - 8 }, tex: 'shin', back: 1 },
+    { n: 'hips', p: null, tex: 'hips' },
+    { n: 'fFt', p: 'fSh', at: { x: 0, y: d.shinL - 10 }, tex: 'foot' },
+    { n: 'fTh', p: 'hips', at: { x: 12 * d.b, y: 16 }, tex: 'thigh' },
+    { n: 'fSh', p: 'fTh', at: { x: 0, y: d.thighL - 8 }, tex: 'shin' },
+    { n: 'waist', p: null, tex: 'waist', key: 'torso' },
+    { n: 'knot', p: 'hips', at: { x: 6, y: 0 }, tex: 'knot' },
+    { n: 'chest', p: 'waist', at: { x: 0, y: -d.waistH }, tex: 'chest' },
+    { n: 'head', p: 'chest', at: { x: 8, y: -d.chestH + 16 }, tex: 'head' },
+    { n: 'fUA', p: 'chest', at: { x: d.S * 0.55, y: -d.chestH * 0.8 }, tex: 'ua' },
+    { n: 'fFA', p: 'fUA', at: { x: 0, y: d.uaL - 6 }, tex: 'fa' },
+    { n: 'fH', p: 'fFA', at: { x: 0, y: d.faL - 4 }, tex: 'fist' },
+  ];
+}
+
+// ---------- parts library (local coords: joint at 0,0; limbs hang down +y; +x = toward opponent) ----------
+const HAIR = {
+  swoop: [[-18,-40],[-28,-46],[-46,-54],[-32,-64],[-50,-78],[-30,-82],[-22,-96],[0,-98],[24,-94],[40,-84],[52,-74],[32,-74],[26,-66],[18,-74],[8,-70],[-2,-76],[-8,-64],[-14,-58],[-16,-44]],
+  short: [[-20,-40],[-28,-50],[-32,-66],[-24,-84],[-4,-92],[16,-90],[30,-82],[36,-68],[28,-71],[26,-64],[20,-72],[12,-67],[6,-74],[-2,-67],[-8,-72],[-12,-58],[-16,-44]],
+  spiky: [[-20,-40],[-34,-48],[-30,-60],[-50,-70],[-30,-76],[-38,-98],[-14,-88],[-4,-112],[10,-90],[28,-104],[28,-84],[48,-82],[34,-70],[26,-64],[14,-70],[0,-68],[-10,-62],[-16,-44]],
+  long: [[-20,-40],[-28,-50],[-32,-66],[-24,-84],[-4,-92],[16,-90],[30,-82],[36,-68],[28,-71],[26,-64],[20,-72],[12,-67],[6,-74],[-2,-67],[-8,-72],[-12,-58],[-16,-44]],
+  buzz: [[-22,-44],[-28,-62],[-20,-80],[0,-88],[22,-84],[30,-72],[28,-66],[10,-71],[-8,-68],[-16,-58],[-19,-46]],
+};
+
+function headPart(g, L, d, hit) {
+  const HS = 1.28; g.save(); g.scaleCanvas(HS, HS);
+  const skin = hex(L.skin), hair = hex(L.hair.color), acc = hex(L.accent), ex = L.extras || [];
+  const style = HAIR[L.hair.style] ? L.hair.style : 'short';
+  const back = [];
+  if (ex.includes('headband')) {
+    back.push({ p: pts([[-24,-66],[-50,-64],[-66,-52],[-48,-56],[-24,-58]]), c: acc, shade: -60 });
+    back.push({ p: pts([[-24,-62],[-44,-52],[-56,-34],[-40,-46],[-22,-56]]), c: acc, shade: -60 });
+  }
+  if (style === 'long') back.push({ p: pts([[-20,-80],[-40,-70],[-48,-30],[-36,-6],[-30,-36],[-14,-60]]), c: hair, shade: -36 });
+  const face = [
+    { p: pts([[-14,6],[14,6],[12,-36],[-12,-36]]), c: skin, shade: -2 },                       // neck (thick, SF style)
+    { p: ell(2, -60, 52, 56), c: skin, shade: -6, deep: 10 },                                  // skull
+    { p: pts([[-16,-54],[24,-58],[28,-46],[24,-34],[12,-27],[-2,-29],[-14,-40]]), c: skin, shade: -4 }, // square jaw
+    { p: ell(-9, -55, 11, 16), c: dark(skin, 0.15) },                                         // ear
+  ];
+  paint(g, [...back, ...face]);
+  g.fillStyle(dark(skin, 0.4)); g.fillPoints(pts([[-12,-32],[12,-32],[12,-22],[-12,-16]]), true);   // shadow under jaw
+  // face
+  const lines = [{ p: [[27,-62],[33,-50],[27,-47]], w: 3, c: dark(skin, 0.55) }, { p: [[12,-46],[19,-41]], w: 2, c: dark(skin, 0.4) }];
+  if (hit) {
+    lines.push({ p: [[8,-64],[18,-60],[8,-56]], w: 4 }, { p: [[30,-63],[24,-60],[30,-57]], w: 3 });
+    paint(g, [{ p: ell(19, -37, 12, 10), c: 0x6a1020 }]);
+  } else {
+    paint(g, [{ p: pts([[8,-62],[21,-63],[19,-57],[10,-57]]), c: 0xffffff, outline: false, ink: 1 },
+              { p: pts([[24,-62],[30,-62],[29,-58],[24,-58]]), c: 0xffffff, outline: false, ink: 1 }]);
+    g.fillStyle(hex(L.eyes)); g.fillCircle(17, -60, 2.8); g.fillCircle(27.5, -60, 1.8);
+    g.fillStyle(OUT); g.fillPoints(pts([[2,-68],[27,-67],[29,-63],[22,-64],[4,-64]]), true);   // heavy angry brow
+    if (L.face === 'grin') paint(g, [{ p: pts([[12,-41],[27,-43],[25,-36],[15,-35]]), c: 0xffffff, outline: false, ink: 1 }]);
+    else lines.push({ p: [[13,-39],[26,-41]], w: 3 });
+  }
+  paint(g, [], lines);
+  // hair on top
+  const hp = pts(HAIR[style]);
+  paint(g, [{ p: hp, c: hair, shade: -6, deep: 12, hi: 22 }], [{ p: [[-6,-88],[6,-80]], w: 2, c: dark(hair, 0.45) }, { p: [[12,-90],[20,-80]], w: 2, c: dark(hair, 0.45) }]);
+  if (ex.includes('headband')) paint(g, [{ p: pts([[-27,-70],[30,-74],[31,-66],[-26,-61]]), c: acc, shade: -10, hi: 22 }]);
+  if (ex.includes('cap')) paint(g, [
+    { p: pts([[-26,-62],[-24,-84],[-4,-96],[20,-92],[32,-76],[30,-66]]), c: acc, shade: -6, hi: 18 },
+    { p: pts([[-22,-66],[-52,-60],[-50,-53],[-22,-58]]), c: dark(acc, 0.2) }]);
+  g.restore();
+  return { x0: -70 * HS, y0: -116 * HS, x1: 56 * HS, y1: 10 * HS };
+}
+
+function makeParts(L) {
+  const d = dims(L), w = d.w, skin = hex(L.skin), top = hex(L.top), bot = hex(L.bottom), martial = L.archetype !== 'brawler';
+  const wrap = martial ? 0xece4cf : 0x2b2b33, shoe = hex(L.shoes), belt = hex(L.belt);
+  const P = {};
+  P.ua = (g) => {
+    const lay = [
+      { p: ell(0, 8, 38 * w, 36), c: skin, shade: -5 * w, hi: 9 * w },                       // deltoid
+      { p: ell(3 * w, d.uaL * 0.46, 32 * w, d.uaL * 0.66), c: skin, shade: -4 * w, hi: 9 * w }, // bicep
+      { p: ell(0, d.uaL - 8, 22 * w, 20), c: skin, shade: -3 },
+    ];
+    if (martial) lay.push({ p: pts([[-20 * w, -6], [20 * w, -6], [21 * w, 16], [8, 22], [0, 16], [-10, 23], [-21 * w, 14]]), c: top, shade: -5 * w, hi: 10 * w });
+    paint(g, lay, [{ p: [[-6 * w, d.uaL * 0.62], [2 * w, d.uaL * 0.7], [10 * w, d.uaL * 0.62]], w: 2, c: dark(skin, 0.45) }]);
+    return { x0: -26 * w, y0: -14, x1: 26 * w, y1: d.uaL + 6 };
+  };
+  P.fa = (g) => {
+    paint(g, [
+      { p: ell(0, d.faL * 0.3, 32 * w, d.faL * 0.62), c: skin, shade: -5 * w, hi: 8 * w },
+      { p: pts([[-14 * w, d.faL * 0.3], [14 * w, d.faL * 0.3], [10 * w, d.faL - 4], [-10 * w, d.faL - 4]]), c: skin, shade: -4 * w, hi: 6 * w },
+      { p: pts([[-11 * w, d.faL - 20], [11 * w, d.faL - 20], [11 * w, d.faL], [-11 * w, d.faL]]), c: wrap, shade: -4 * w },
+    ], [{ p: [[-4 * w, 10], [4 * w, d.faL * 0.5]], w: 2, c: dark(skin, 0.4) }]);
+    return { x0: -22 * w, y0: -12, x1: 22 * w, y1: d.faL + 6 };
+  };
+  P.fist = (g) => {
+    const f = d.f, glove = martial ? skin : 0x2b2b33;
+    paint(g, [
+      { p: pts([[-15 * f, -2], [15 * f, -2], [17 * f, 20 * f], [12 * f, 29 * f], [-13 * f, 29 * f], [-16 * f, 18 * f]]), c: glove, shade: -6 * f, hi: 8 * f },
+      { p: pts([[-13 * f, 18 * f], [16 * f, 18 * f], [12 * f, 30 * f], [-12 * f, 30 * f]]), c: martial ? wrap : skin, shade: -5 * f },
+      { p: ell(13 * f, 9 * f, 12 * f, 17 * f), c: martial ? skin : glove, shade: 10 * f },
+    ], [{ p: [[-6 * f, 22 * f], [-6 * f, 29 * f]], w: 2 }, { p: [[2 * f, 22 * f], [2 * f, 29 * f]], w: 2 }]);
+    return { x0: -22 * f, y0: -10, x1: 24 * f, y1: 36 * f };
+  };
+  P.palm = (g) => {
+    const f = d.f, glove = martial ? skin : 0x2b2b33;
+    paint(g, [
+      { p: pts([[-13 * f, -2], [13 * f, -2], [14 * f, 24 * f], [-13 * f, 24 * f]]), c: glove, shade: -5 * f },
+      { p: pts([[-13 * f, 20 * f], [13 * f, 20 * f], [12 * f, 44 * f], [6 * f, 47 * f], [-12 * f, 44 * f]]), c: skin, shade: -5 * f, hi: 7 * f },
+      { p: ell(16 * f, 14 * f, 10 * f, 20 * f), c: skin, shade: 14 * f },
+    ], [{ p: [[-5 * f, 30 * f], [-5 * f, 44 * f]], w: 2 }, { p: [[3 * f, 30 * f], [3 * f, 45 * f]], w: 2 }]);
+    return { x0: -20 * f, y0: -10, x1: 26 * f, y1: 52 * f };
+  };
+  P.thigh = (g) => {
+    const tw = martial ? 50 : 40;
+    paint(g, [{ p: ell(0, d.thighL * 0.46, tw * d.b, d.thighL * 1.1), c: bot, shade: -7 * d.b, hi: 12 * d.b }],
+      [{ p: [[-8, d.thighL * 0.3], [4, d.thighL * 0.45]], w: 2, c: dark(bot, 0.5) }, { p: [[-12, d.thighL * 0.6], [0, d.thighL * 0.72]], w: 2, c: dark(bot, 0.5) }]);
+    return { x0: -30 * d.b, y0: -20, x1: 30 * d.b, y1: d.thighL * 1.05 };
+  };
+  P.shin = (g) => {
+    const Ls = d.shinL, B = d.b;
+    const lay = martial
+      ? [{ p: ell(0, 0, 36 * B, 28), c: bot, shade: -6 }, { p: pts([[-16 * B, -6], [16 * B, -6], [26 * B, Ls], [-24 * B, Ls]]), c: bot, shade: -7 * B, hi: 12 * B }]
+      : [{ p: ell(0, 0, 30 * B, 24), c: bot, shade: -6 }, { p: pts([[-15 * B, -6], [15 * B, -6], [17 * B, Ls - 8], [-17 * B, Ls - 8]]), c: bot, shade: -6 * B, hi: 9 * B }];
+    paint(g, lay, [{ p: [[-6, Ls * 0.4], [6, Ls * 0.55]], w: 2, c: dark(bot, 0.5) }]);
+    return { x0: -32 * B, y0: -20, x1: 32 * B, y1: Ls + 6 };
+  };
+  P.foot = (g) => {
+    if (martial) paint(g, [{ p: pts([[-14, -6], [8, -8], [22, 2], [46, 6], [52, 14], [48, 21], [-12, 21], [-17, 10]]), c: skin, shade: 2, tilt: 0 }],
+      [{ p: [[40, 12], [42, 20]], w: 2 }, { p: [[33, 12], [35, 20]], w: 2 }]);
+    else paint(g, [{ p: pts([[-18, -10], [16, -10], [30, 0], [50, 6], [54, 18], [50, 24], [-18, 24]]), c: shoe, shade: 4, hi: 30 },
+                   { p: pts([[-18, 16], [54, 16], [52, 25], [-18, 25]]), c: 0xf2f2f2 }],
+      [{ p: [[14, -4], [24, 4]], w: 2 }, { p: [[22, -2], [30, 6]], w: 2 }]);
+    return { x0: -24, y0: -18, x1: 60, y1: 32 };
+  };
+  P.hips = (g) => {
+    paint(g, [{ p: pts([[-30 * d.b, -4], [30 * d.b, -4], [34 * d.b, 26], [-34 * d.b, 26]]), c: bot, shade: -10 * d.b },
+              { p: pts([[-31 * d.b, -8], [31 * d.b, -8], [32 * d.b, 5], [-32 * d.b, 5]]), c: belt, shade: -10 * d.b, hi: 18 * d.b }]);
+    return { x0: -40 * d.b, y0: -16, x1: 40 * d.b, y1: 34 };
+  };
+  P.knot = (g) => {
+    if (martial) paint(g, [{ p: pts([[0, 0], [8, 0], [14, 34], [6, 36]]), c: belt, shade: 3 }, { p: pts([[-4, 2], [3, 2], [-2, 30], [-9, 28]]), c: belt, shade: -4 },
+                           { p: pts([[-6, -8], [10, -8], [10, 5], [-6, 5]]), c: belt, hi: 4 }]);
+    else paint(g, [{ p: pts([[-8, -8], [8, -8], [8, 6], [-8, 6]]), c: 0xe0b040, shade: -2, hi: 3 }]);
+    return { x0: -16, y0: -16, x1: 20, y1: 42 };
+  };
+  P.waist = (g) => {
+    paint(g, [{ p: pts([[-30 * d.b, 4], [30 * d.b, 4], [d.Wb + 1, -d.waistH - 2], [-d.Wb - 1, -d.waistH - 2]]), c: top, shade: -9 * d.b, hi: 14 * d.b }],
+      martial ? [{ p: [[-18 * d.b, -d.waistH], [16 * d.b, 0]], w: 3, c: dark(top, 0.5) }] : [{ p: [[-6, -d.waistH * 0.5], [6, -d.waistH * 0.4]], w: 2, c: dark(top, 0.5) }]);
+    return { x0: -38 * d.b, y0: -d.waistH - 10, x1: 38 * d.b, y1: 12 };
+  };
+  P.chest = (g) => {
+    const H = d.chestH, S = d.S, Lt = d.Lt, Wb = d.Wb;
+    const sil = pts([[-Wb, 0], [Wb, 0], [Lt, -H * 0.45], [S, -H * 0.76], [S * 0.8, -H], [12, -H - 6], [-12, -H - 6], [-S * 0.8, -H], [-S, -H * 0.76], [-Lt, -H * 0.45]]);
+    const traps = pts([[-S * 0.75, -H + 2], [-12, -H - 6], [-9, -H - 14], [9, -H - 14], [12, -H - 6], [S * 0.75, -H + 2]]);
+    if (martial) {
+      paint(g, [{ p: traps, c: skin, shade: -4 }, { p: sil, c: top, shade: -S * 0.25, deep: S * 0.3, hi: S * 0.45 }]);
+      const v = pts([[-18, -H - 6], [18, -H - 6], [6, -H * 0.22], [-6, -H * 0.22]]);
+      paint(g, [{ p: v, c: skin, outline: false, ink: 1, shade: -4, hi: 8 }],
+        [{ p: [[-14, -H * 0.62], [-4, -H * 0.55], [0, -H * 0.6]], w: 2, c: dark(skin, 0.45) }, { p: [[0, -H * 0.6], [6, -H * 0.55], [14, -H * 0.62]], w: 2, c: dark(skin, 0.45) },
+         { p: [[-18, -H - 6], [-6, -H * 0.22]], w: 5, c: light(top, 0.35) }, { p: [[18, -H - 6], [6, -H * 0.22]], w: 5, c: light(top, 0.35) }]);
+    } else {
+      paint(g, [{ p: traps, c: skin, shade: -4 }, { p: sil, c: skin, shade: -S * 0.25, deep: S * 0.3, hi: S * 0.45 }]);
+      const tank = pts([[-Wb + 1, 0], [Wb - 1, 0], [Lt - 5, -H * 0.45], [S * 0.5, -H * 0.82], [S * 0.38, -H - 2], [12, -H * 0.66], [-12, -H * 0.66], [-S * 0.38, -H - 2], [-S * 0.5, -H * 0.82], [-Lt + 5, -H * 0.45]]);
+      paint(g, [{ p: tank, c: top, outline: false, ink: 1, shade: -S * 0.22, hi: S * 0.3 }],
+        [{ p: [[-S * 0.62, -H * 0.62], [-S * 0.5, -H * 0.4]], w: 2, c: dark(skin, 0.45) }, { p: [[S * 0.62, -H * 0.62], [S * 0.5, -H * 0.4]], w: 2, c: dark(skin, 0.45) }]);
+    }
+    return { x0: -S - 10, y0: -H - 22, x1: S + 10, y1: 8 };
+  };
+  P.head = (g) => headPart(g, L, d, false);
+  P.headHit = (g) => headPart(g, L, d, true);
+  return { d, P };
+}
+
+let texCounter = 0;
+function buildTextures(scene, L) {
+  const { d, P } = makeParts(L), id = 'f' + (texCounter++) + '_', tex = {};
+  for (const [name, draw] of Object.entries(P)) {
+    const probe = scene.make.graphics({}, false); const bb = draw(probe); probe.destroy();
+    const g = scene.make.graphics({}, false);
+    g.translateCanvas(PAD - bb.x0, PAD - bb.y0); draw(g);
+    const tw = Math.ceil(bb.x1 - bb.x0 + PAD * 2), th = Math.ceil(bb.y1 - bb.y0 + PAD * 2);
+    g.generateTexture(id + name, tw, th); g.destroy();
+    tex[name] = { key: id + name, ox: (PAD - bb.x0) / tw, oy: (PAD - bb.y0) / th };
+  }
+  return { d, tex };
+}
+
+// ---------- poses (degrees; 0 = hanging straight down; negative = swing toward opponent) ----------
+const flat = (p) => ({ ...p, fFt: p.fFt ?? -(p.fTh + p.fSh), bFt: p.bFt ?? -(p.bTh + p.bSh) });
+const STANCE = { torso: 4, chest: 6, head: -8, fUA: -58, fFA: -100, fH: 0, bUA: -22, bFA: -118, bH: 0, fTh: -32, fSh: 38, bTh: 30, bSh: 22, hips: 0, knot: 0 };
+const P = (o = {}) => flat({ ...STANCE, ...o });
+const LUNGE = { fTh: -44, fSh: 30, bTh: 40, bSh: 6 };
+const ANIMS = {
+  idle: { loop: true, frames: [
+    { pose: P(), dur: 18, ease: 'sine' },
+    { pose: P({ fTh: -38, fSh: 48, bTh: 34, bSh: 30, chest: 9, fUA: -54, bUA: -18, head: -6 }), dur: 18, ease: 'sine' } ] },
+  walk: { loop: true, frames: [
+    { pose: P({ fTh: -42, fSh: 26, bTh: 34, bSh: 28 }), dur: 8, ease: 'sine' },
+    { pose: P({ fTh: -10, fSh: 18, bTh: 2, bSh: 62, chest: 9 }), dur: 8, ease: 'sine' },
+    { pose: P({ fTh: 22, fSh: 30, bTh: -36, bSh: 26 }), dur: 8, ease: 'sine' },
+    { pose: P({ fTh: -2, fSh: 62, bTh: -8, bSh: 16, chest: 9 }), dur: 8, ease: 'sine' } ] },
+  punch: { attack: { from: 4, to: 10, reach: 175, dmg: 8, y: 250 }, frames: [
+    { pose: P({ fUA: -50, fFA: -118, chest: 0 }), dur: 3, ease: 'sine' },
+    { pose: P({ fUA: -98, fFA: -2, torso: 12, chest: 14, head: -16, bUA: -10, bFA: -125, ...LUNGE }), dur: 2, ease: 'out' },
+    { pose: P({ fUA: -98, fFA: -2, torso: 12, chest: 14, head: -16, bUA: -10, bFA: -125, ...LUNGE }), dur: 6, ease: 'linear' },
+    { pose: P(), dur: 8, ease: 'sine' } ] },
+  kick: { attack: { from: 8, to: 16, reach: 200, dmg: 12, y: 280 }, frames: [
+    { pose: P({ fTh: -100, fSh: 118, torso: -6, chest: -4, fUA: -40, bUA: -10 }), dur: 6, ease: 'sine' },
+    { pose: P({ fTh: -108, fSh: 2, fFt: 10, torso: -22, chest: -10, head: 10, bTh: 14, bSh: 4, fUA: -10, fFA: -70, bUA: -70, bFA: -60 }), dur: 2, ease: 'out' },
+    { pose: P({ fTh: -108, fSh: 2, fFt: 10, torso: -22, chest: -10, head: 10, bTh: 14, bSh: 4, fUA: -10, fFA: -70, bUA: -70, bFA: -60 }), dur: 8, ease: 'linear' },
+    { pose: P({ fTh: -100, fSh: 118, torso: -6 }), dur: 6, ease: 'sine' },
+    { pose: P(), dur: 8, ease: 'sine' } ] },
+  special: { spawn: 14, frames: [
+    { pose: P({ fUA: 30, fFA: -110, bUA: 44, bFA: -110, torso: -8, chest: -10, head: -4, ...LUNGE, hand: 'palm' }), dur: 10, ease: 'sine' },
+    { pose: P({ fUA: 30, fFA: -110, bUA: 44, bFA: -110, torso: -8, chest: -10, head: -4, ...LUNGE, hand: 'palm' }), dur: 4, ease: 'linear' },
+    { pose: P({ fUA: -92, fFA: -4, bUA: -86, bFA: -8, torso: 14, chest: 14, head: -12, ...LUNGE, fTh: -50, hand: 'palm' }), dur: 3, ease: 'out' },
+    { pose: P({ fUA: -92, fFA: -4, bUA: -86, bFA: -8, torso: 14, chest: 14, head: -12, ...LUNGE, fTh: -50, hand: 'palm' }), dur: 16, ease: 'linear' },
+    { pose: P(), dur: 10, ease: 'sine' } ] },
+  hit: { frames: [
+    { pose: P({ torso: -26, chest: -16, head: -30, fUA: 30, fFA: -50, bUA: 46, bFA: -40, fTh: -14, fSh: 22, bTh: 34, bSh: 34, face: 'hit' }), dur: 2, ease: 'out' },
+    { pose: P({ torso: -26, chest: -16, head: -30, fUA: 30, fFA: -50, bUA: 46, bFA: -40, fTh: -14, fSh: 22, bTh: 34, bSh: 34, face: 'hit' }), dur: 12, ease: 'linear' },
+    { pose: P(), dur: 12, ease: 'sine' } ] },
+  dizzy: { loop: true, dizzy: true, frames: [
+    { pose: P({ torso: -10, chest: -6, head: 20, fUA: 14, fFA: -10, bUA: 20, bFA: -10, fTh: -12, fSh: 32, bTh: 14, bSh: 32, face: 'hit' }), dur: 34, ease: 'sine' },
+    { pose: P({ torso: 12, chest: 6, head: -18, fUA: 6, fFA: -16, bUA: 10, bFA: -20, fTh: -18, fSh: 40, bTh: 10, bSh: 38, face: 'hit' }), dur: 34, ease: 'sine' } ] },
+  win: { loop: true, frames: [
+    { pose: P({ torso: -4, chest: -8, head: -20, fUA: -176, fFA: -8, bUA: 28, bFA: -60, fTh: -14, fSh: 14, bTh: 14, bSh: 10 }), dur: 8, ease: 'out' },
+    { pose: P({ torso: -6, chest: -10, head: -24, fUA: -178, fFA: -2, bUA: 30, bFA: -66, fTh: -20, fSh: 24, bTh: 18, bSh: 18 }), dur: 22, ease: 'sine' },
+    { pose: P({ torso: -4, chest: -8, head: -20, fUA: -176, fFA: -8, bUA: 28, bFA: -60, fTh: -14, fSh: 14, bTh: 14, bSh: 10 }), dur: 22, ease: 'sine' } ] },
+};
+const EASE = { sine: (p) => 0.5 - 0.5 * Math.cos(Math.PI * p), out: (p) => 1 - (1 - p) * (1 - p), linear: (p) => p };
+
+class Fighter {
+  constructor(scene, look, x, facing) {
+    this.scene = scene; this.x = x; this.facing = facing; this.hp = 100; this.shake = 0;
+    this.container = scene.add.container(x, GROUND).setDepth(5);
+    this.bones = scene.add.graphics(); this.stars = scene.add.graphics();
+    this.setLook(look); this.pose = P(); this.play('idle');
+  }
+  setLook(look) {
+    if (this.built) { this.sprites.forEach((s) => s.destroy()); Object.values(this.built.tex).forEach((t) => this.scene.textures.remove(t.key)); }
+    this.look = look; this.built = buildTextures(this.scene, look); this.skel = skeleton(this.built.d);
+    this.sprites = this.skel.map((b) => {
+      const t = this.built.tex[b.tex], s = this.scene.add.image(0, 0, t.key).setOrigin(t.ox, t.oy);
+      if (b.back) s.setTint(0xa9aed0);
+      this.container.add(s); return s;
+    });
+    this.container.add([this.bones, this.stars]); this.container.bringToTop(this.bones); this.container.bringToTop(this.stars);
+  }
+  play(name) { this.anim = ANIMS[name]; this.animName = name; this.t = 0; this.from = { ...this.pose }; this.landed = false; this.spawned = false; }
+  get busy() { return !this.anim.loop; }
+  step() {
+    const fr = this.anim.frames, total = fr.reduce((a, f) => a + f.dur, 0);
+    let t = this.t, i = 0; while (i < fr.length - 1 && t >= fr[i].dur) { t -= fr[i].dur; i++; }
+    const prev = i === 0 ? (this.anim.loop ? fr[fr.length - 1].pose : this.from) : fr[i - 1].pose;
+    const p = EASE[fr[i].ease](Math.min(1, t / fr[i].dur)), cur = fr[i].pose, out = {};
+    for (const k in cur) out[k] = typeof cur[k] === 'string' ? cur[k] : (prev[k] ?? 0) + (cur[k] - (prev[k] ?? 0)) * p;
+    this.pose = out; this.t++;
+    if (this.t >= total) { if (this.anim.loop) this.t = 0; else this.play('idle'); }
+  }
+  render(showBones) {
+    const W = {}, rad = Math.PI / 180, byName = Object.fromEntries(this.skel.map((b) => [b.n, b]));
+    const ang = (b) => (this.pose[b.key || b.n] || 0) * rad;
+    const world = (b) => {
+      if (W[b.n]) return W[b.n];
+      if (!b.p) return (W[b.n] = { x: 0, y: 0, r: ang(b) });
+      const par = world(byName[b.p]), c = Math.cos(par.r), s = Math.sin(par.r);
+      return (W[b.n] = { x: par.x + b.at.x * c - b.at.y * s, y: par.y + b.at.x * s + b.at.y * c, r: par.r + ang(b) });
+    };
+    this.skel.forEach(world);
+    const ground = Math.max(W.fFt.y, W.bFt.y) + 22;
+    const tex = this.built.tex, hand = this.pose.hand === 'palm' ? tex.palm : tex.fist, head = this.pose.face === 'hit' ? tex.headHit : tex.head;
+    this.skel.forEach((b, i) => {
+      const s = this.sprites[i];
+      let t = null; if (b.tex === 'fist') t = hand; else if (b.tex === 'head') t = head;
+      if (t && s.texture.key !== t.key) s.setTexture(t.key).setOrigin(t.ox, t.oy);
+      s.setPosition(W[b.n].x, W[b.n].y - ground).setRotation(W[b.n].r);
+    });
+    const jitter = this.shake > 0 ? (Math.random() - 0.5) * 8 : 0;
+    this.container.setPosition(this.x + jitter, GROUND).setScale(this.facing, 1);
+    this.W = W; this.groundOff = ground;
+    this.bones.clear();
+    if (showBones) {
+      this.bones.lineStyle(3, 0xff2fd0);
+      for (const b of this.skel) if (b.p) this.bones.lineBetween(W[b.p].x, W[b.p].y - ground, W[b.n].x, W[b.n].y - ground);
+      this.bones.fillStyle(0xffff00); for (const b of this.skel) this.bones.fillCircle(W[b.n].x, W[b.n].y - ground, 4);
+    }
+    this.stars.clear();
+    if (this.anim.dizzy) {
+      const hy = W.head.y - ground - 120, hx = W.head.x, a = this.scene.time.now / 260;
+      for (let i = 0; i < 3; i++) {
+        const an = a + (i * Math.PI * 2) / 3, sx = hx + Math.cos(an) * 38, sy = hy + Math.sin(an) * 10, st = [];
+        for (let j = 0; j < 10; j++) { const rr = j % 2 ? 5 : 12, aa = (j * Math.PI) / 5 - Math.PI / 2; st.push({ x: sx + Math.cos(aa) * rr, y: sy + Math.sin(aa) * rr }); }
+        this.stars.fillStyle(0xffe14a); this.stars.lineStyle(3, OUT); this.stars.fillPoints(st, true); this.stars.strokePoints(st, true, true);
+      }
+    }
+  }
+  handWorld() { // where the front hand is on screen (for spawning specials)
+    const h = this.W.fH; return { x: this.x + this.facing * h.x, y: GROUND + h.y - this.groundOff };
+  }
+}
+
+// ---------- the stage ----------
+class Stage extends Phaser.Scene {
+  create() {
+    const g = this.add.graphics();
+    g.fillGradientStyle(0x5b2a86, 0x5b2a86, 0xff9a4a, 0xff9a4a, 1); g.fillRect(0, 0, 960, 330);
+    g.fillStyle(0xffe08a); g.fillCircle(700, 250, 70);
+    g.fillStyle(0x7a4a9a); g.fillPoints(pts([[0,330],[0,230],[120,180],[230,220],[360,160],[480,215],[600,175],[740,225],[860,170],[960,205],[960,330]]), true);
+    g.fillStyle(0x553877); g.fillPoints(pts([[0,330],[0,270],[160,240],[300,275],[460,235],[640,280],[800,245],[960,270],[960,330]]), true);
+    // palm trees
+    const palm = (x, h) => { g.fillStyle(0x2a1a3a); g.fillPoints(pts([[x-5,330],[x+5,330],[x+12,330-h],[x+4,330-h]]), true);
+      for (let i = 0; i < 7; i++) { const a = -Math.PI + (i / 6) * Math.PI, cx = x + 8, cy = 330 - h;
+        g.fillPoints(pts([[cx, cy], [cx + Math.cos(a) * 60, cy + Math.sin(a) * 26 + 18], [cx + Math.cos(a) * 30, cy + Math.sin(a) * 10 + 4]]), true); } };
+    palm(90, 190); palm(170, 150); palm(860, 200);
+    // bleachers + crowd
+    g.fillStyle(0x8c93a8); g.fillRect(230, 250, 520, 90); g.fillStyle(0x6c7388); for (let i = 0; i < 4; i++) g.fillRect(230, 262 + i * 22, 520, 4);
+    const crowd = [0xff5d5d, 0x5dc7ff, 0xffd84a, 0x7dff6a, 0xff7ad9, 0xffffff, 0xb07aff];
+    this.crowd = [];
+    for (let r = 0; r < 4; r++) for (let i = 0; i < 26; i++) {
+      const c = this.add.graphics({ x: 242 + i * 20 + (r % 2) * 8, y: 258 + r * 22 });
+      c.fillStyle(crowd[(i * 7 + r * 3) % crowd.length]); c.fillRect(-6, -2, 12, 10); c.fillStyle(0xf1c08f); c.fillCircle(0, -7, 5);
+      this.crowd.push(c);
+    }
+    // track floor
+    g.fillStyle(0xc4553a); g.fillRect(0, 340, 960, 200);
+    g.fillStyle(0xaa4630); g.fillRect(0, 340, 960, 14);
+    g.lineStyle(4, 0xfff2e0, 0.85); for (let i = 0; i < 4; i++) g.lineBetween(0, 380 + i * 44, 960, 380 + i * 44 + i * 6);
+    this.shadows = this.add.graphics().setDepth(4);
+    this.fx = this.add.graphics().setDepth(8);
+    this.hud = this.add.graphics().setDepth(9);
+    const ts = { fontFamily: 'Impact, Haettenschweiler, sans-serif', fontSize: '26px', color: '#fff', stroke: '#1a1424', strokeThickness: 6 };
+    this.n1 = this.add.text(48, 58, '', ts).setDepth(9); this.n2 = this.add.text(912, 58, '', ts).setOrigin(1, 0).setDepth(9);
+    this.add.text(480, 52, '99', { ...ts, fontSize: '44px', color: '#ffe14a' }).setOrigin(0.5, 0).setDepth(9);
+    this.add.text(480, 18, 'KO', { ...ts, fontSize: '30px', color: '#ff4040' }).setOrigin(0.5, 0).setDepth(9);
+    this.banner = this.add.text(480, 210, '', { ...ts, fontSize: '84px', color: '#ffe14a', strokeThickness: 10 }).setOrigin(0.5).setDepth(10);
+    this.callout = this.add.text(480, 150, '', { ...ts, fontSize: '44px', color: '#ffffff', strokeThickness: 8 }).setOrigin(0.5).setDepth(10);
+
+    this.colin = new Fighter(this, LOOKS.colin, 320, 1);
+    this.ryan = new Fighter(this, LOOKS.ryan, 650, -1);
+    this.keys = this.input.keyboard.addKeys('LEFT,RIGHT,U,J,I,H,Z,W');
+    this.acc = 0; this.cpuTimer = 90; this.freeze = 0; this.balls = []; this.sparks = [];
+    this.pixel = this.cameras.main.postFX.addPixelate(1);
+    // HUD gets its own camera so the pixel filter doesn't smear the text
+    const ui = [this.hud, this.n1, this.n2, this.banner, this.callout, ...this.children.list.filter((o) => o.type === 'Text')];
+    this.cameras.main.ignore(ui);
+    this.uiCam = this.cameras.add(0, 0, 960, 540); this.uiCam.ignore(this.children.list.filter((o) => !ui.includes(o)));
+    this.events.on('addedtoscene', (o) => { if (!ui.includes(o)) this.uiCam.ignore(o); });
+    window.spike = this;
+  }
+  act(p, name) { if (!p.busy || name === 'hit') p.play(name); }
+  land(att, def, dmg, x, y) {
+    def.play('hit'); def.hp = Math.max(0, def.hp - dmg); def.shake = 10; this.freeze = 9;
+    def.x = Phaser.Math.Clamp(def.x + att.facing * 26, 90, 870);
+    this.sparks.push({ x, y, t: 0 });
+    this.cameras.main.shake(110, 0.006);
+    if (def.hp === 0) {
+      this.banner.setText('K.O.!'); this.freeze = 40;
+      this.time.delayedCall(700, () => { def.play('dizzy'); att.play('win'); });
+      this.time.delayedCall(3000, () => { this.banner.setText(''); this.colin.hp = this.ryan.hp = 100; this.colin.play('idle'); this.ryan.play('idle'); });
+    }
+  }
+  tryHit(att, def) {
+    const a = att.anim.attack; if (!a || att.landed) return;
+    if (att.t >= a.from && att.t <= a.to && Math.abs(att.x - def.x) < a.reach) {
+      att.landed = true; this.land(att, def, a.dmg, def.x - att.facing * 40, GROUND - a.y);
+    }
+  }
+  tick() {
+    const c = this.colin, r = this.ryan, k = this.keys, ko = c.hp === 0 || r.hp === 0;
+    c.shake = Math.max(0, c.shake - 1); r.shake = Math.max(0, r.shake - 1);
+    if (this.freeze > 0) { this.freeze--; return; }   // hit-stop: everything pauses for a moment on impact
+    if (!ko) {
+      const JD = Phaser.Input.Keyboard.JustDown;
+      if (JD(k.U)) this.act(c, 'punch'); if (JD(k.J)) this.act(c, 'kick'); if (JD(k.I)) this.act(c, 'special');
+      if (JD(k.H)) this.act(c, 'hit'); if (JD(k.Z)) this.act(c, 'dizzy'); if (JD(k.W)) this.act(c, 'win');
+      const dir = (k.RIGHT.isDown ? 1 : 0) - (k.LEFT.isDown ? 1 : 0);
+      if (c.animName === 'walk' || c.animName === 'idle') {
+        if (dir) { c.x = Phaser.Math.Clamp(c.x + dir * (dir > 0 ? 3.4 : 2.6), 90, r.x - 120); if (c.animName !== 'walk') c.play('walk'); }
+        else if (c.animName === 'walk') c.play('idle');
+      }
+      if (document.getElementById('cpu').checked && --this.cpuTimer <= 0 && !r.busy) {
+        const dist = r.x - c.x; this.cpuTimer = 50 + Math.random() * 70;
+        if (dist > 260) this.act(r, Math.random() < 0.4 ? 'special' : 'idle'), (r.x -= dist > 300 ? 30 : 0);
+        else this.act(r, Math.random() < 0.5 ? 'punch' : 'kick');
+      }
+      for (const f of [c, r]) if (f.anim.spawn && !f.spawned && f.t >= f.anim.spawn) {
+        f.spawned = true; const h = f.handWorld();
+        this.balls.push({ x: h.x + f.facing * 30, y: h.y + 10, dir: f.facing, owner: f, color: hex(f.look.special?.color || '#66ccff'), t: 0 });
+        this.callout.setText((f.look.special?.name || 'SPECIAL') + '!'); this.time.delayedCall(900, () => this.callout.setText(''));
+      }
+      this.tryHit(c, r); this.tryHit(r, c);
+      for (const b of this.balls) {
+        b.x += b.dir * 8; b.t++;
+        const def = b.owner === c ? r : c;
+        if (!b.done && Math.abs(b.x - def.x) < 50) { b.done = true; this.land(b.owner, def, 10, b.x, b.y); }
+        if (b.x < -60 || b.x > 1020) b.done = true;
+      }
+      this.balls = this.balls.filter((b) => !b.done);
+    }
+    c.step(); r.step();
+    this.sparks.forEach((s) => s.t++); this.sparks = this.sparks.filter((s) => s.t < 12);
+  }
+  update(time, dtMs) {
+    this.pixel.amount = document.getElementById('pixel').checked ? 1 : 0;
+    const slow = document.getElementById('slow').checked ? 0.2 : 1;
+    this.acc += dtMs * slow; let n = 0;
+    while (this.acc >= 1000 / 60 && n++ < 5) { this.tick(); this.acc -= 1000 / 60; }
+    const bones = document.getElementById('bones').checked;
+    this.colin.render(bones); this.ryan.render(bones);
+    this.crowd.forEach((c, i) => c.y += Math.sin(time / 120 + i) * 0.15);
+    this.shadows.clear(); this.shadows.fillStyle(0x2a0a20, 0.35);
+    this.shadows.fillEllipse(this.colin.x, GROUND + 4, 150, 20); this.shadows.fillEllipse(this.ryan.x, GROUND + 4, 140, 20);
+    const fx = this.fx; fx.clear();
+    for (const b of this.balls) {   // energy blast: glow + swirl + white-hot core
+      for (let i = 1; i <= 4; i++) { fx.fillStyle(b.color, 0.12 * i); fx.fillCircle(b.x - b.dir * i * 14, b.y, 30 - i * 4); }
+      fx.fillStyle(b.color, 0.45); fx.fillCircle(b.x, b.y, 34 + Math.sin(b.t) * 3);
+      fx.fillStyle(light(b.color, 0.4)); fx.fillCircle(b.x, b.y, 24);
+      fx.fillStyle(0xffffff); fx.fillCircle(b.x + b.dir * 4, b.y, 12);
+      fx.lineStyle(4, 0xffffff, 0.8); fx.beginPath(); fx.arc(b.x, b.y, 30, b.t * 0.4, b.t * 0.4 + 2); fx.strokePath();
+    }
+    for (const s of this.sparks) {  // hit spark: a quick starburst
+      const r = 14 + s.t * 5, a = 1 - s.t / 12, st = [];
+      for (let j = 0; j < 16; j++) { const rr = j % 2 ? r * 0.4 : r, aa = (j * Math.PI) / 8 + s.t * 0.1; st.push({ x: s.x + Math.cos(aa) * rr, y: s.y + Math.sin(aa) * rr }); }
+      fx.fillStyle(0xffe14a, a); fx.fillPoints(st, true); fx.fillStyle(0xffffff, a); fx.fillCircle(s.x, s.y, r * 0.35);
+    }
+    const h = this.hud; h.clear();
+    const bar = (x, pct, flip) => { h.fillStyle(0x1a1424); h.fillRect(x - 5, 16, 380, 36); h.fillStyle(0xd22b2b); h.fillRect(x, 21, 370, 26);
+      h.fillStyle(0xffd23b); const w = 370 * pct; h.fillRect(flip ? x + 370 - w : x, 21, w, 26); h.fillStyle(0xffffff, 0.35); h.fillRect(flip ? x + 370 - w : x, 23, w, 6); };
+    bar(44, this.colin.hp / 100, false); bar(546, this.ryan.hp / 100, true);
+    this.n1.setText(this.colin.look.name || 'P1'); this.n2.setText(this.ryan.look.name || 'P2');
+  }
+}
+
+new Phaser.Game({ type: Phaser.WEBGL, parent: 'game', width: 960, height: 540, backgroundColor: '#14142a',
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY }, scene: Stage });
+
+// ---------- page controls ----------
+let editing = 'colin';
+const ta = document.getElementById('look'), err = document.getElementById('err');
+const show = (who) => { editing = who; ta.value = JSON.stringify(LOOKS[who], null, 2); err.textContent = ''; };
+show('colin');
+document.getElementById('whoC').onclick = () => show('colin');
+document.getElementById('whoR').onclick = () => show('ryan');
+document.getElementById('apply').onclick = () => {
+  try { const look = JSON.parse(ta.value); LOOKS[editing] = look; window.spike[editing].setLook(look); err.textContent = 'Applied!'; }
+  catch (e) { err.textContent = 'Oops: ' + e.message; }
+};
+document.getElementById('rand').onclick = () => {
+  const pick = (a) => a[Math.floor(Math.random() * a.length)], col = () => '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+  const look = { name: LOOKS[editing].name, archetype: pick(['martial', 'brawler']), height: +(0.85 + Math.random() * 0.3).toFixed(2),
+    build: pick(['lean', 'medium', 'big']), muscle: +(0.9 + Math.random() * 0.5).toFixed(2),
+    skin: pick(['#f1c08f', '#e0ac69', '#c68642', '#8d5524', '#ffdbac']), eyes: pick(['#3b6fb6', '#6b4423', '#3f8f4a']), face: pick(['determined', 'grin']),
+    hair: { style: pick(Object.keys(HAIR)), color: pick(['#f7d35c', '#6e4022', '#1d1d1d', '#c0392b', '#e8e8e8', '#ff6fd8']) },
+    top: col(), bottom: col(), belt: pick(['#1d1d1d', '#6b3d1e', '#ffffff', '#e04848']), shoes: col(), extras: pick([[], ['headband'], ['cap']]), accent: col(),
+    special: { name: pick(['DONUT BLAST', 'HOME RUN', 'POWER WAVE', 'TURBO TOSS']), color: col() } };
+  ta.value = JSON.stringify(look, null, 2); document.getElementById('apply').click();
+};
+document.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => window.spike.act(window.spike.colin, b.dataset.a));
+</script>
+</body>
+</html>
