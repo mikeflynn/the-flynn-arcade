@@ -6,3 +6,6 @@ export * from "./body";
 export * from "./skeleton";
 export * from "./kinematics";
 export * from "./pose";
+export { bodyParts } from "./parts/body";
+export { handParts } from "./parts/hands";
+export { weaponShape } from "./parts/weapons";
