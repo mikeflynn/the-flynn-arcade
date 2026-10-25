@@ -3,10 +3,15 @@
 
 import { addStun, damageOf, GUARD_FROM, knockDown, setTimed } from "./combat";
 import { B } from "./input";
+import { pushWidth } from "./movement";
 import type { FState, FighterState, MatchEvent, MatchState } from "./types";
 
-/** How close (center to center) a throw reaches. */
-const THROW_RANGE = 70;
+/**
+ * How far apart the two bodies may be for a normal throw: the gap between them,
+ * which is the center distance minus pushWidth (how close they can stand).
+ * 16 is about 96 px center to center at height 1. The command throw uses 30.
+ */
+export const THROW_GAP = 16;
 const THROW_DAMAGE = 14;
 const THROW_DIZZY = 16;
 /** How long the thrower is stuck after grabbing. */
@@ -60,7 +65,7 @@ export function tryThrow(s: MatchState, attacker: 0 | 1): MatchEvent[] | null {
   if (att.airborne || !GUARD_FROM.includes(att.state)) return null;
   if (def.airborne || NOT_THROWABLE.includes(def.state)) return null;
   const input = throwInput(att);
-  if (!input || Math.abs(def.x - att.x) > THROW_RANGE) return null;
+  if (!input || Math.abs(def.x - att.x) - pushWidth(att, def) > THROW_GAP) return null;
 
   const back = input === "back";
   const damage = damageOf(att, THROW_DAMAGE, s.settings.damageScale);

@@ -5,13 +5,13 @@ import { createMatch, matchWinner, stepMatch } from "../../src/engine/match";
 import type { FState, MatchEvent, MatchState } from "../../src/engine/types";
 import { mySettings, type Settings } from "../../src/settings";
 
-function fighter() {
-  return normalizeFighter({ name: "T", look: { height: 1 }, stats: { power: 5 } }, "t", [], () => {})!;
+function fighter(height = 1) {
+  return normalizeFighter({ name: "T", look: { height }, stats: { power: 5 } }, "t", [], () => {})!;
 }
 
 /** A match past the intro, with P1 at x1 and P2 at x2 (P1 on the left, facing right). */
-function newMatch(x1 = 400, x2 = 480, settings: Partial<Settings> = {}): MatchState {
-  const s = createMatch({ p1: fighter(), p2: fighter(), settings: { ...mySettings, ...settings }, seed: 1 });
+function newMatch(x1 = 400, x2 = 480, settings: Partial<Settings> = {}, height = 1): MatchState {
+  const s = createMatch({ p1: fighter(height), p2: fighter(height), settings: { ...mySettings, ...settings }, seed: 1 });
   for (let i = 0; i < 90; i++) stepMatch(s, [0, 0]);
   s.fighters[0].x = x1;
   s.fighters[1].x = x2;
@@ -25,6 +25,16 @@ function run(s: MatchState, n: number, p1: InputFrame = 0, p2: InputFrame = 0): 
   const out: Tagged[] = [];
   for (let i = 0; i < n; i++) for (const e of stepMatch(s, [p1, p2])) out.push({ ...e, step: i });
   return out;
+}
+
+/** P1 holds forward until the push stops them: touching, as close as two fighters can stand. */
+function touching(settings: Partial<Settings> = {}, height = 1): MatchState {
+  const s = newMatch(400, 520, settings, height);
+  run(s, 60, FWD);
+  const gap = s.fighters[1].x - s.fighters[0].x;
+  expect(gap).toBeCloseTo(80 * height, 5);
+  run(s, 1); // let go of forward and settle
+  return s;
 }
 
 /** Steps until the next hit event (at most 60 steps) and returns the events of the steps it took. */
@@ -44,7 +54,7 @@ const P2_BACK = B.RIGHT;
 
 describe("throws", () => {
   it("forward + Heavy Punch at 60 px throws: 14 damage and a knockdown", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     const events = run(s, 1, FWD | B.HP);
     expect(of(events, "throw")).toMatchObject([{ player: 0, damage: 14 }]);
     expect(of(events, "knockdown")).toMatchObject([{ player: 1 }]);
@@ -55,7 +65,7 @@ describe("throws", () => {
   });
 
   it("Medium Punch throws too", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     expect(of(run(s, 1, BACK | B.MP), "throw")).toHaveLength(1);
   });
 
@@ -68,15 +78,28 @@ describe("throws", () => {
     expect(s.fighters[1].health).toBe(s.fighters[1].maxHealth);
   });
 
+  it("the throw reaches the gap between bodies, so tall fighters (height 1.15) can throw when touching", () => {
+    const s = touching({}, 1.15);
+    expect(of(run(s, 1, FWD | B.HP), "throw")).toHaveLength(1);
+  });
+
+  it("just inside the reach (96 px apart) throws; just outside (100 px) is a normal attack", () => {
+    const near = newMatch(400, 496);
+    expect(of(run(near, 1, FWD | B.HP), "throw")).toHaveLength(1);
+    const far = newMatch(400, 500);
+    expect(of(run(far, 1, FWD | B.HP), "throw")).toHaveLength(0);
+    expect(far.fighters[0].attack?.data.id).toBe("st.HP");
+  });
+
   it("a punch with no direction, or a light punch, is not a throw", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     expect(of(run(s, 1, B.HP), "throw")).toHaveLength(0);
-    const t = newMatch(400, 460);
+    const t = touching();
     expect(of(run(t, 1, FWD | B.LP), "throw")).toHaveLength(0);
   });
 
   it("throwing toward the back switches sides", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     run(s, 1, BACK | B.HP);
     expect(s.fighters[1].x).toBeLessThan(s.fighters[0].x);
     expect(s.fighters[1].health).toBe(s.fighters[1].maxHealth - 14);
@@ -86,14 +109,15 @@ describe("throws", () => {
   });
 
   it("a forward throw keeps sides", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     run(s, 1, FWD | B.HP);
     expect(s.fighters[1].x).toBeGreaterThan(s.fighters[0].x);
   });
 
   it.each<FState>(["hitstun", "blockstun", "jumpSquat", "knockdown", "getup"])("can't throw a defender in %s", (state) => {
-    const s = newMatch(400, 460);
+    const s = touching();
     s.fighters[1].state = state;
+    s.fighters[1].stateFrame = 0;
     s.fighters[1].stateLength = 30;
     const events = run(s, 1, FWD | B.HP);
     expect(of(events, "throw")).toHaveLength(0);
@@ -101,17 +125,17 @@ describe("throws", () => {
   });
 
   it("can't throw a jumping defender, and can't throw while jumping", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     run(s, 8, 0, B.UP); // P2 is airborne by now
     expect(s.fighters[1].airborne).toBe(true);
     expect(of(run(s, 1, FWD | B.HP), "throw")).toHaveLength(0);
-    const t = newMatch(400, 460);
+    const t = touching();
     run(t, 8, B.UP);
     expect(of(run(t, 1, FWD | B.HP), "throw")).toHaveLength(0);
   });
 
   it("the thrown fighter can't be hit while down or getting up (60 frames), then can be", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     run(s, 1, FWD | B.HP);
     run(s, 24); // the thrower is free again
     const healthDown = s.fighters[1].health;
@@ -129,7 +153,7 @@ describe("throw tech", () => {
   const withTech = { throwTechEnabled: true };
 
   it("back + Medium Punch 3 frames after the grab breaks it: no damage, pushed apart", () => {
-    const s = newMatch(400, 460, withTech);
+    const s = touching(withTech);
     const events = run(s, 1, FWD | B.HP);
     expect(of(events, "throw")).toHaveLength(1);
     expect(s.fighters[1].state).toBe("thrown");
@@ -145,7 +169,7 @@ describe("throw tech", () => {
   });
 
   it("with nobody breaking it, the throw lands after 6 frames", () => {
-    const s = newMatch(400, 460, withTech);
+    const s = touching(withTech);
     run(s, 1, FWD | B.HP);
     run(s, 5);
     expect(s.fighters[1].health).toBe(s.fighters[1].maxHealth);
@@ -156,7 +180,7 @@ describe("throw tech", () => {
   });
 
   it("a punch with no direction is too late or not a break", () => {
-    const s = newMatch(400, 460, withTech);
+    const s = touching(withTech);
     run(s, 1, FWD | B.HP);
     run(s, 2);
     run(s, 1, 0, B.MP);
@@ -165,7 +189,7 @@ describe("throw tech", () => {
   });
 
   it("a break after the 6 frames is too late", () => {
-    const s = newMatch(400, 460, withTech);
+    const s = touching(withTech);
     run(s, 1, FWD | B.HP);
     run(s, 8);
     run(s, 1, 0, P2_BACK | B.MP);
@@ -173,7 +197,7 @@ describe("throw tech", () => {
   });
 
   it("without throwTechEnabled the break does nothing", () => {
-    const s = newMatch(400, 460);
+    const s = touching();
     run(s, 1, FWD | B.HP);
     run(s, 2);
     run(s, 1, 0, P2_BACK | B.MP);
