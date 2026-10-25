@@ -7,24 +7,27 @@
 - A `/add-fighter` Claude Code skill writes new fighter files.
 
 **Architecture:** Three layers, each testable on its own.
-1. **`lib/rig`** (`@web-games/rig`): Phaser-free code turns a `Look` into cel-shaded part shapes, a skeleton, poses and forward kinematics. A thin `src/phaser/` adapter turns those into textures and a container of sprites.
+1. **`lib/rig`** (`@web-games/rig`): Phaser-free code turns a `Look` into cel-shaded part shapes, a skeleton, poses, forward kinematics and foot planting.
+   - A Canvas 2D baker (`src/canvas/`) turns every animation frame into palette-locked pixel art packed into sprite-sheet pages.
+   - A thin `src/phaser/` adapter shows the baked frames as one image per fighter.
 2. **`flynn-family-fighters/src/engine/`**: a pure, deterministic, frame-counted fight simulation. `stepMatch(state, [p1Input, p2Input])` mutates state and returns events. It has no Phaser and no `Math.random`.
 3. **Phaser scenes**: only draw the simulation's state (rig poses, effects, HUD) and send in inputs from `lib/input` or the CPU.
 
 **Tech Stack:** TypeScript 5.9.3 (strict), Vite 7.3.7, Phaser 3.90.0 (WebGL), Vitest 5.0.5, npm workspaces, nginx 1.27 (Docker), GitHub Actions → GHCR.
 
 **Spec:** `docs/superpowers/specs/2026-10-22-flynn-family-fighters-design.md`.
-- **Look-and-feel reference:** `docs/superpowers/specs/2026-10-22-flynn-family-fighters-spike.html`.
-- **Port, don't invent:** port its part shapes, colors, poses and paint passes from there.
+- **Look-and-feel reference:** `docs/superpowers/specs/2026-10-25-flynn-family-fighters-spike-v3.html` (v3). The older `…-spike.html` (v2) is history only.
+- **Port, don't invent:** port part shapes, colors, poses, paint passes, the bake, foot planting and the movement/blocking rules from v3. "The spike" below always means v3.
 
 ## Global Constraints
 
 - **Branch:** work on `flynn-family-fighters`, created from `main` in Task 1. Merge only when playable; pushes to `main` deploy to the live arcade.
 - **Versions:** same as the rest of the repo: `phaser` 3.90.0, `vite` 7.3.7, `vitest` 5.0.5, `typescript` 5.9.3, Node 22.
 - **Port 8002:** dev server, preview, and Docker host port.
-- **Canvas:** logical 960×540, `Phaser.WEBGL`, `Scale.FIT`, `pixelArt: false`.
-  - Pixel filter: `cameras.main.postFX.addPixelate(1)` when `PIXEL_FILTER` is on.
-  - The HUD and all text live on a second camera with no filter.
+- **Canvas:** game config `width: 480, height: 270`, `Phaser.WEBGL`, `pixelArt: true`, `roundPixels: true`, `Scale.FIT` + `CENTER_BOTH`.
+  - Each scene's main camera has `setZoom(0.5)` and `centerOn(480, 270)`, so all game code and the engine use **960×540 world units** while every world unit is half a real pixel.
+  - There is no pixel filter and no second camera; the HUD is pixel art on the same camera.
+- **Fighter pixel size:** fighters are baked at **0.4 real pixels per art unit** (`FIGHTER_SCALE = 0.8` of the art's 0.5). Their sprite is shown at scale `±2`, so one baked pixel = one real pixel. Engine positions for hands and head are art-unit joints × 0.8.
 - **No Capcom anything:** no Capcom names, sprites, music, sounds, logos or character likenesses. Move types have generic names; fighters name their own specials.
 - **Family-friendly:**
   - No blood.
@@ -39,6 +42,7 @@
   - The runtime normalizers fix typos, with a friendly `console.warn`.
 - **Purity:**
   - `lib/rig/src/**` must not import Phaser, except under `lib/rig/src/phaser/`.
+  - Only `lib/rig/src/canvas/` and `src/phaser/` touch the DOM (Canvas 2D). Everything else in `lib/rig` runs under Node so Vitest can test it.
   - `flynn-family-fighters/src/engine/**` must not import Phaser.
   - The engine uses only its seeded `Rng`, never `Math.random`.
 - **Timing:** the simulation runs at a fixed 60 steps/second × the `GAME_SPEED` multiplier `[1, 1.15, 1.3, 1.5]`. All durations are in frames.
@@ -54,10 +58,10 @@
    - Owner: Task 8.
 2. **Both players pick the same fighter, or the roster has only one fighter.**
    - Expected: a mirror match, with P2 in alternate colors so you can tell them apart.
-   - Owner: Task 3 (`alternateColors`) and Task 17.
+   - Owner: Task 2 (`alternateColors`) and Task 17.
 3. **Both attacks connect on the same frame (a trade).** Expected: both take damage and both go into hit stun; neither is ignored. Owner: Task 11.
 4. **A fighter is pinned in the corner, or jumps over the opponent.**
-   - Expected: pushback moves the attacker instead; nobody leaves the stage; facing flips after a cross-over.
+   - Expected: a forward jump always escapes over an opponent standing right next to you, for every `jump` stat 1–10 (a kid can set `jump: 1`). Pushback moves the attacker instead; nobody leaves the stage; facing flips after a cross-over.
    - Owner: Tasks 10–11.
 5. **The tab is hidden for a while, or the computer is slow.** Expected: the game doesn't fast-forward dozens of frames on return. Each render runs at most 5 simulation steps. Owner: Task 16 (`stepsToRun`).
 
@@ -72,22 +76,27 @@ lib/rig/                         NEW @web-games/rig
   src/paint.ts                   Layer, Line, PartShape, paintCommands() → DrawCmd[]
   src/look.ts                    Look type, DEFAULT_LOOK, option lists, normalizeLook(), alternateColors()
   src/body.ts                    BodyDims, bodyDims()
-  src/skeleton.ts                Bone, skeleton()
-  src/kinematics.ts              solvePose(), groundOffset()
-  src/pose.ts                    Pose, Keyframe, Animation, samplePose(), animLength(), flatFeet()
-  src/parts/body.ts              chest, waist, hips, knot, ua, fa, thigh, shin, foot (per archetype × frame)
+  src/skeleton.ts                Bone, skeleton(), LIMB_GROUPS
+  src/kinematics.ts              solvePose(), plantFeet(), groundOffset()
+  src/pose.ts                    Pose, Keyframe, Animation, samplePose(), animLength(), flatFeet(), heldFrames(), shownFrame()
+  src/parts/body.ts              neck, chest, waist, hips, knot, ua, fa, thigh, shin, foot (per archetype × frame)
   src/parts/hands.ts             fist, palm, fistArmed (fist + weapon)
   src/parts/head.ts              head + headHit (face options, hair, extras)
   src/parts/hair.ts              HAIR outlines + back pieces
   src/parts/weapons.ts           weapon shapes
-  src/parts/index.ts             buildParts(look, dims) → Record<PartName, PartShape>
-  src/phaser/textures.ts         buildRigTextures(), textureLayout()
-  src/phaser/RigSprite.ts        RigSprite (container, setPose, facing, bones overlay)
+  src/parts/index.ts             buildParts(look, dims) → Record<ShapeName, PartShape>
+  src/bake/plan.ts               planFrames(): which frames to draw, in which order (pure)
+  src/bake/quantize.ts           snapToPalette() (pure)
+  src/bake/pack.ts               packCells() (pure)
+  src/canvas/bakeFighter.ts      bakeFighter(): Canvas 2D drawing → BakedFighter (DOM, no Phaser)
+  src/phaser/bakedTexture.ts     addBakedTextures(), removeBakedTextures()
+  src/phaser/FighterSprite.ts    FighterSprite (one image, show(anim, frame), facing, joints)
   src/phaser/portrait.ts         renderPortrait()
-  src/index.ts                   re-exports (NOT the phaser/ folder; that's "@web-games/rig/phaser")
+  src/index.ts                   re-exports (NOT canvas/ or phaser/; those are "@web-games/rig/canvas" and "@web-games/rig/phaser")
 flynn-family-fighters/           NEW game (port 8002)
   arcade.ts  index.html  vite.config.ts  package.json  tsconfig.json  Dockerfile  nginx.conf  README.md
   public/assets/{sounds,music,fighters}/   (empty, .gitkeep)
+  public/assets/fonts/           PressStart2P-Regular.ttf + OFL.txt (Task 16)
   src/settings.ts  controls.ts  sounds.ts  stages.ts  moves.ts  animations.ts   (kid files)
   src/characters/colin.ts  ryan.ts
   src/fighter.ts                 Fighter type, normalizeFighter()
@@ -102,7 +111,7 @@ flynn-family-fighters/           NEW game (port 8002)
   src/engine/match.ts            createMatch(), stepMatch(), rounds, timer, KO, dizzy, knockdown
   src/engine/cpu.ts              CpuBrain
   src/engine/ladder.ts           arcade-mode opponent order
-  src/render/FighterView.ts      state → animation → RigSprite
+  src/render/FighterView.ts      state → animation → FighterSprite
   src/render/effects.ts          sparks, projectiles, dizzy stars
   src/render/hud.ts              health bars, timer, names, round markers, banners, combo counter
   src/render/stageView.ts        stage drawing from stages.ts
@@ -125,20 +134,23 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 **Interfaces:**
 - Produces:
   - `hex(s: unknown, fallback: number): number`, `mix(a: number, b: number, f: number): number`
-  - `darken(c: number, f = 0.3): number` (mixes toward `0x1a1030`), `lighten(c: number, f = 0.3): number` (toward white)
+  - `darken(c: number, f = 0.3): number` (mixes toward purple `SHADE = 0x2c1458`), `lighten(c: number, f = 0.3): number` (toward warm `HILITE = 0xfff0c8`)
+  - `outlineOf(c: number): number` = `mix(c, INK, 0.74)` with `INK = 0x160c22` (an outline is a dark version of the color it surrounds)
+  - `backTint(c: number): number` = `mix(c, 0x3a2a66, 0.26)` (far limbs: same colors, a step darker)
   - `type Pt = { x: number; y: number }`, `pts(a: [number, number][]): Pt[]`
   - `ellipse(x, y, w, h, n = 22): Pt[]`, `clipHalfPlane(poly: Pt[], nx: number, ny: number, d: number): Pt[]` (keeps `nx*x + ny*y <= d`)
   - `interface Layer { p: Pt[]; c: number; outline?: boolean; ink?: boolean; shade?: number; tilt?: number; deep?: number; hi?: number }`
   - `interface Line { p: [number, number][]; w?: number; c?: number }`
   - `interface PartShape { layers: Layer[]; lines: Line[]; bbox: { x0: number; y0: number; x1: number; y1: number } }`
-  - `type DrawCmd = { kind: "fill"; pts: Pt[]; color: number; alpha?: number } | { kind: "stroke"; pts: Pt[]; color: number; width: number; closed: boolean }`
-  - `paintCommands(shape: PartShape): DrawCmd[]`
-  - `OUTLINE = 0x1a1424`
+  - `type DrawCmd = { kind: "fill"; pts: Pt[]; color: number } | { kind: "stroke"; pts: Pt[]; color: number; width: number; closed: boolean }`
+  - `type PaintMode = "both" | "outline" | "fill"`
+  - `paintCommands(shape: PartShape, mode: PaintMode = "both"): DrawCmd[]`
+  - `OUTLINE_WIDTH = 5` (art units; the baker keeps it about 2.5 real pixels)
 
 - [ ] **Step 1:** `git checkout -b flynn-family-fighters`.
 - [ ] **Step 2:** Create `lib/rig/package.json`, modeled on `lib/audio/package.json`:
   - name `@web-games/rig`
-  - `exports: { ".": "./src/index.ts", "./phaser": "./src/phaser/index.ts" }`
+  - `exports: { ".": "./src/index.ts", "./canvas": "./src/canvas/index.ts", "./phaser": "./src/phaser/index.ts" }`
   - `phaser` 3.90.0 as both a peer and a dev dependency
 
   Add `tsconfig.json` like `lib/settings`. Run `npm install` at the root.
@@ -148,16 +160,18 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - `ellipse(0,0,20,10).length === 22`, with all points within the 20×10 box.
   - `hex("#ff0000", 0) === 0xff0000`, `hex("banana", 7) === 7`.
   - `paintCommands`, for one layer `{p: square, c: 0x00ff00, shade: 0, hi: 5}`:
-    - the first commands are an outline fill and an outline stroke, in color `OUTLINE` and width 7
+    - the first commands are an outline fill and an outline stroke, in color `outlineOf(0x00ff00)` and width `OUTLINE_WIDTH`
     - then the base fill, in `0x00ff00`
     - then a shadow fill, whose points all have x ≤ 0
     - then a highlight fill, whose points all have x ≥ 5
-  - A layer with `outline: false` produces no `OUTLINE` commands before its fill.
+  - A layer with `outline: false` produces no outline commands before its fill.
+  - `mode: "outline"` returns only the outline commands; `mode: "fill"` returns everything except them; `"both"` = outline + fill in that order.
+  - `darken(0xffffff, 0.5)` has more blue than red (shadows lean purple); `outlineOf(0xf1c08f)` is darker than `0xf1c08f` in every channel but isn't `INK`.
 - [ ] **Step 4:** Run `npm test -w lib/rig`. Expected: FAIL (modules missing).
 - [ ] **Step 5: Implement.** `paintCommands` follows the spike's `paint()` order exactly:
-  1. outline pass for all layers
-  2. per layer: base fill; shadow `darken(c, .32)` for `x + tilt*y <= shade`; deep shadow `darken(c, .52)` for `<= shade - (deep ?? 9)`; highlight `lighten(c, .32)` for `x >= hi`; ink stroke (width 3) if `ink`
-  3. lines, stroked with `w ?? 3` and `c ?? OUTLINE`
+  1. outline pass for all outlined layers (`outlineOf(c)` fill + stroke)
+  2. per layer: base fill; shadow `darken(c, .3)` for `x + tilt*y <= shade`; deep shadow `darken(c, .5)` for `<= shade - (deep ?? 9)`; highlight `lighten(c, .38)` for `x >= hi`; ink stroke (width 3, `outlineOf(c)`) if `ink`
+  3. lines, stroked with `w ?? 3` and `c ?? INK`
 
   Skip any clipped polygon with fewer than 3 points.
 - [ ] **Step 6:** Run `npm test -w lib/rig && npm run typecheck -w lib/rig`. Expected: PASS.
@@ -211,7 +225,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 - [ ] **Step 4:** Run `npm test -w lib/rig`. Expected: PASS.
 - [ ] **Step 5:** Commit: `feat(rig): add Look type with forgiving normalizer and alternate colors`.
 
-### Task 3: Body frames, skeleton, kinematics
+### Task 3: Body frames, skeleton, kinematics, foot planting
 
 **Files:**
 - Create: `lib/rig/src/body.ts`, `lib/rig/src/skeleton.ts`, `lib/rig/src/kinematics.ts`
@@ -220,43 +234,55 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 **Interfaces:**
 - Consumes: `Look` (Task 2).
 - Produces:
-  - `interface BodyDims { k; b; m; w; chestH; S; Lt; Wb; waistH; hipsHalf; uaL; faL; thighL; thighW; shinL; fist; neckHalf; headScale; feminine: boolean }`
+  - `interface BodyDims { k; b; m; w; chestH; S; Lt; Wb; waistH; hipsHalf; uaL; faL; thighL; thighW; shinL; fist; footScale; neckHalf; headScale; feminine: boolean }`
   - `bodyDims(look: Look): BodyDims`
-  - `type PartName = "chest"|"waist"|"hips"|"knot"|"ua"|"fa"|"thigh"|"shin"|"foot"|"hand"|"head"`
+  - `type PartName = "neck"|"chest"|"waist"|"hips"|"knot"|"ua"|"fa"|"thigh"|"shin"|"foot"|"hand"|"head"`
   - `interface Bone { name: string; parent: string | null; at: { x: number; y: number }; part: PartName; back?: boolean; angleKey?: string }`
-  - `skeleton(d: BodyDims): Bone[]`: 17 bones in draw order, back to front, exactly as the spike's `skeleton()`, except that `waist` has parent `"hips"` at `{0,0}` with `angleKey: "torso"`, so the `hips` angle rotates the whole body.
+  - `skeleton(d: BodyDims): Bone[]`: the spike's 18 bones, with `waist` parented to `"hips"` at `{0,0}` with `angleKey: "torso"`, so the `hips` angle rotates the whole body.
+    - `neck` and `head` are both children of `chest` at `{x: 8, y: -chestH + 22}`.
+    - `neck` has `angleKey: "head"` so it turns with the head.
+  - `LIMB_GROUPS: string[][]`, the draw order, back to front: `[["bUA","bFA","bH"], ["bFt","bTh","bSh"], ["hips","fFt","fTh","fSh"], ["neck","waist","chest"], ["knot"], ["head"], ["fUA","fFA","fH"]]`
   - `type World = Record<string, { x: number; y: number; r: number }>`
   - `solvePose(bones: Bone[], pose: Record<string, number | string>): World` (angles in degrees; missing = 0)
-  - `groundOffset(world: World): number` (max joint y + 22)
+  - `plantFeet(bones: Bone[], pose: Pose, d: BodyDims): Pose`: two-bone IK that bends each planted leg so its ankle lands on the floor (the lowest planted ankle). `pose.plant` is `"fb"` (default), `"f"`, `"b"` or `""`.
+  - `groundOffset(world: World): number`: the lowest ankle y + 26.
+  - **Standing height in the air:** for `plant: ""` (airborne) frames, callers use the standing pose's `groundOffset` instead of the frame's own, so the body keeps its standing height and the jump arc lifts it.
 
-**Frame proportions** (k = height, b = build `{lean: .92, medium: 1, big: 1.18}`, m = muscle):
+**Frame proportions** (k = height, b = build `{lean: .92, medium: 1, big: 1.18}`, m = muscle). The masculine row is the v3 spike's exaggerated SF2 proportions; the feminine row keeps the same ratios to it that it had in v2.
 
-| | chestH | S | Lt | Wb | waistH | hipsHalf | uaL | faL | thighL | thighW× | shinL | fist | neckHalf | headScale |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| masculine | 70k | 52bm | 40bm | 27b | 38k | 30b | 60k | 54k | 80k | 1.0 | 78k | 1.12√(bm) | 13 | 1.28 |
-| feminine | 66k | 42bm | 33bm | 22b | 40k | 34b | 57k | 51k | 84k | 1.08 | 80k | 0.95√(bm) | 10 | 1.24 |
+| | chestH | S | Lt | Wb | waistH | hipsHalf | uaL | faL | thighL | thighW× | shinL | fist | footScale | neckHalf | headScale |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| masculine | 72k | 62bm | 40bm | 22b | 36k | 30b | 60k | 54k | 80k | 1.0 | 78k | 1.5√(bm) | 1.28 | 15 | 1.24 |
+| feminine | 68k | 50bm | 33bm | 18b | 38k | 34b | 57k | 51k | 84k | 1.08 | 80k | 1.27√(bm) | 1.15 | 11 | 1.2 |
 
 - [ ] **Step 1: Write failing tests.**
-  - `skeleton(bodyDims(DEFAULT_LOOK)).length === 17`.
+  - `skeleton(bodyDims(DEFAULT_LOOK)).length === 18`.
   - Every non-null `parent` names an earlier-or-later bone that exists.
   - The bone names are the spike's set.
+  - `LIMB_GROUPS.flat()` contains every bone exactly once.
   - Feminine has a smaller `S`, a larger `hipsHalf` and a larger `thighL` than masculine for the same look.
   - A taller look gives a larger `thighL`.
   - `solvePose`:
     - with all angles 0, the `fSh` joint is directly below `fTh` (same x, larger y);
     - with `{ hips: 90 }`, the `head` joint ends up to the left of the hips (x < 0), since the whole body rotates;
     - `fFA` rotates with `fUA`: `{ fUA: -90 }` puts the elbow at x > 0, the same height as the shoulder ± 1.
-  - `groundOffset` of the standing pose equals the max foot-joint y + 22.
+  - `plantFeet`:
+    - On the spike's `STANCE` (`fTh -32, fSh 38, bTh 30, bSh 22`), the raw back ankle is higher than the front one. After `plantFeet`, both ankles are within 0.5 of the same y, and each ankle's x is unchanged (± 0.5).
+    - `plant: "f"` leaves the back leg's angles unchanged; `plant: ""` returns the pose unchanged.
+    - Knees bend toward the opponent: each planted knee is at a larger x than the straight line from hip to ankle.
+    - An unreachable target (ankle far below) gives a straight leg with finite numbers, never NaN.
+    - The planted foot stays flat: the foot bone's world angle is 0 ± 0.5°.
+  - `groundOffset` of the standing pose equals the lowest ankle y + 26.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
-- [ ] **Step 3: Implement.** `solvePose` uses recursive memoized forward kinematics like the spike's `render()`:
+- [ ] **Step 3: Implement.** `solvePose` uses recursive memoized forward kinematics like the spike's `fk()`:
   ```
   child.x = parent.x + at.x*cos(parent.r) - at.y*sin(parent.r)
   child.y = parent.y + at.x*sin(parent.r) + at.y*cos(parent.r)
   child.r = parent.r + rad(pose[angleKey ?? name] ?? 0)
   ```
-  Non-number pose values are ignored.
+  Non-number pose values are ignored. `plantFeet` ports the spike's version: law of cosines with leg lengths `thighL - 8` and `shinL - 10`; the thigh angle is the target angle minus the hip angle (knee forward); the foot angle is −(shin world angle).
 - [ ] **Step 4:** Run the tests. Expected: PASS.
-- [ ] **Step 5:** Commit: `feat(rig): add body frames, skeleton and forward kinematics`.
+- [ ] **Step 5:** Commit: `feat(rig): add body frames, skeleton, kinematics and foot planting`.
 
 ### Task 4: Poses and animation sampling
 
@@ -272,6 +298,9 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - `animLength(a: Animation): number`
   - `samplePose(a: Animation, frame: number, from: Pose): Pose`
   - `flatFeet(p: Pose): Pose` (fills `fFt = -(fTh+fSh)` and `bFt = -(bTh+bSh)` when absent)
+  - `heldFrames(a: Animation, fps: 15 | 20 | 30): number[]`: the frames that get baked, sorted and unique: every `60 / fps`th frame, plus each keyframe's first frame (so strike frames always show).
+  - `shownFrame(held: number[], frame: number): number`: the latest held frame ≤ `frame`, after the same looping/holding rules as `samplePose`.
+- **Starting pose:** a non-looping animation eases key 0 from the caller's `from` pose. Callers always pass `STANCE`, never the previous animation's pose, because SF2 frames snap.
 
 - [ ] **Step 1: Write failing tests.**
   - `animLength({loop:false, keys:[{frames:3},{frames:5}]}) === 8`.
@@ -281,6 +310,8 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - String fields (`hand: "palm"`) come from the current key, not interpolated.
   - Frames past the end of a non-looping animation hold the last pose.
   - `flatFeet({fTh: -30, fSh: 40, bTh: 20, bSh: 10}).fFt === -10`, and an existing `fFt` is kept.
+  - `heldFrames` for keys of 4, 2 and 6 frames at fps 20 is `[0, 3, 4, 6, 9]` (multiples of 3 plus key starts 0, 4, 6).
+  - `shownFrame([0, 3, 4, 6, 9], 5) === 4`; frame 11 of that non-looping 12-frame animation shows 9.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3: Implement.** Use the easing functions from the spike: `sine = .5 - .5cos(πp)`, `out = 1-(1-p)²`, `snap = 1`.
 - [ ] **Step 4:** Run the tests. Expected: PASS.
@@ -295,11 +326,12 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 **Interfaces:**
 - Consumes: `Layer`, `Line`, `PartShape`, `pts`, `ellipse` (Task 1); `Look` (Task 2); `BodyDims` (Task 3).
 - Produces:
-  - `bodyParts(look: Look, d: BodyDims): Record<"chest"|"waist"|"hips"|"knot"|"ua"|"fa"|"thigh"|"shin"|"foot", PartShape>`
+  - `bodyParts(look: Look, d: BodyDims): Record<"neck"|"chest"|"waist"|"hips"|"knot"|"ua"|"fa"|"thigh"|"shin"|"foot", PartShape>`
   - `handParts(look: Look, d: BodyDims): { fist: PartShape; palm: PartShape; fistArmed: PartShape }`
   - `weaponShape(weapon: string, look: Look): PartShape | null`
 - **Coordinates:** local; joint at (0,0); limbs hang toward +y; +x faces the opponent.
-- **Port from the spike:** the shapes of `P.ua`, `fa`, `fist`, `palm`, `thigh`, `shin`, `foot`, `hips`, `knot`, `waist` and `chest`.
+- **Port from the spike:** the shapes of `P.neck`, `ua`, `fa`, `fist`, `palm`, `thigh`, `shin`, `foot` (scaled by `footScale`), `hips`, `knot`, `waist` and `chest`, including their muscle and fold lines.
+  - `neck` is scaled by `headScale` like the head, and carries the shadow under the jaw.
 - **Feminine frame:**
   - narrower chest silhouette (from `S`, `Lt`, `Wb`), no pec lines, wider `hips` (`hipsHalf`)
   - legs drawn with `thighW`
@@ -309,7 +341,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 
 - [ ] **Step 1: Write failing tests.** Loop over every combination of `BODY_FRAMES × ARCHETYPES × BUILDS × muscle {0.8, 1.4} × WEAPONS`. For each part:
   - `layers.length ≥ 1`;
-  - every layer point and line point is finite and inside `bbox`, allowing 4 px for the 7 px outline stroke;
+  - every layer point and line point is finite and inside `bbox`, allowing 3 units for the outline stroke;
   - `bbox.x1 > bbox.x0` and `bbox.y1 > bbox.y0`.
   - **Width checks:** the feminine `chest` bbox is narrower than masculine; the `big` + muscle 1.4 chest is wider than `lean` + 0.8.
   - **Archetype checks:** a martial masculine `ua` has a layer with color `hex(look.top)` (the torn sleeve); a brawler `ua` doesn't.
@@ -328,9 +360,15 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 **Interfaces:**
 - Produces:
   - `headPart(look: Look, d: BodyDims, variant: "normal" | "hit"): PartShape`
-  - `type TextureName = "chest"|"waist"|"hips"|"knot"|"ua"|"fa"|"thigh"|"shin"|"foot"|"fist"|"palm"|"fistArmed"|"head"|"headHit"`
-  - `buildParts(look: Look, d: BodyDims): Record<TextureName, PartShape>`
-- **Port from the spike:** `headPart`, the `HAIR` outlines for swoop/short/spiky/long/buzz, and the headband and cap.
+  - `type ShapeName = "neck"|"chest"|"waist"|"hips"|"knot"|"ua"|"fa"|"thigh"|"shin"|"foot"|"fist"|"palm"|"fistArmed"|"head"|"headHit"`
+  - `buildParts(look: Look, d: BodyDims): Record<ShapeName, PartShape>`
+- **Port from the spike:** `headPart` (v3, with its face fixes), the `HAIR` outlines for swoop/short/spiky/long/buzz, and the headband and cap.
+- **Face rules from the spike** (every face option must follow them):
+  - no outline or box around the eye whites; the brow sits right on top as the upper lid;
+  - the nose is a layer that shares the face's outline, never a loose line;
+  - the ear has `outline: false`, with one short inner line;
+  - no cheek line or other stray strokes;
+  - the neck is not part of the head (it's the `neck` body part).
 - **New in this task:**
   - **Hair:**
     - `ponytail`: the short front plus a back tail behind the head
@@ -349,9 +387,9 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
     - `eyeShape`:
       - `narrow`: the spike's eyes
       - `round`: taller whites
-    - `nose`:
-      - `straight`: the spike's nose line
-      - `button`: a short curve
+    - `nose` (each a skin layer that shares the face outline):
+      - `straight`: the spike's nose
+      - `button`: a smaller, rounder tip
       - `wide`: a wider base
     - `freckles`: 5 small dots across the cheek.
     - `lashes`: 3 short strokes on the near eye.
@@ -361,55 +399,79 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
     - `glasses` (two outlined frames) and `sunglasses` (filled dark lenses)
     - `wristbands` live on the `fa` part, in `accent` color, next to the wrap
   - **Hit variant:** squeezed eyes and an open mouth, as in the spike.
-  - The head is scaled by `d.headScale` (the spike used `scaleCanvas`). Here, scale the point coordinates instead, so the shape stays pure data.
+  - The head (and neck) are scaled by `d.headScale` (the spike used `scaleCanvas`). Here, scale the point coordinates instead, so the shape stays pure data. Feet scale by `footScale` the same way.
 
 - [ ] **Step 1: Write failing tests.**
   - For every `HAIR_STYLES × JAWS × BROWS × EYE_SHAPES × NOSES × extras subset {[], ["headband","glasses"], ["cap","earrings","bow"]} × variants`, apply the same finiteness and bbox checks as Task 5.
   - The `"hit"` variant's layers differ from `"normal"` (they don't deep-equal).
-  - `buildParts(DEFAULT_LOOK, dims)` has all 14 `TextureName` keys.
+  - **Face rules:** no eye-white layer (`c === 0xffffff`) has `ink: true` or an outline; the ear layer has `outline: false`.
+  - `buildParts(DEFAULT_LOOK, dims)` has all 15 `ShapeName` keys.
   - Two looks that differ only in `face.jaw` produce different `head` layers.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run `npm test -w lib/rig && npm run typecheck -w lib/rig`. Expected: PASS.
 - [ ] **Step 5:** Commit: `feat(rig): add head part with face options, hair and extras`.
 
-### Task 7: Phaser adapter: textures, `RigSprite`, portraits, PNG overrides
+### Task 7: Baking sprite sheets, the Phaser adapter, portraits, PNG overrides
 
 **Files:**
-- Create: `lib/rig/src/phaser/{textures,RigSprite,portrait,index}.ts`
-- Test: `lib/rig/tests/textureLayout.test.ts` (this tests the pure layout math only)
+- Create: `lib/rig/src/bake/{plan,quantize,pack}.ts`, `lib/rig/src/canvas/{bakeFighter,index}.ts`, `lib/rig/src/phaser/{bakedTexture,FighterSprite,portrait,index}.ts`
+- Test: `lib/rig/tests/bake.test.ts` (the pure `bake/` code only; Canvas drawing is checked visually in Task 8)
 
 **Interfaces:**
-- Consumes: `buildParts`, `paintCommands`, `skeleton`, `solvePose`, `groundOffset`, `bodyDims`.
-- Produces (from `@web-games/rig/phaser`):
-  - `textureLayout(bbox, pad = 12): { width: number; height: number; offsetX: number; offsetY: number; originX: number; originY: number }`
-  - `interface RigTextures { id: string; look: Look; dims: BodyDims; bones: Bone[]; tex: Record<TextureName, { key: string; originX: number; originY: number }> }`
-  - `buildRigTextures(scene: Phaser.Scene, look: Look, overrides?: Partial<Record<TextureName, string>>): RigTextures`. `overrides` maps a part to an already-loaded image key.
-  - `destroyRigTextures(scene, t: RigTextures): void`
-  - `class RigSprite`:
-    - `constructor(scene, textures: RigTextures, x: number, y: number)`
-    - `setPose(pose: Pose): this`, `setFacing(f: 1 | -1): this`, `setPosition(x, y): this`
-    - `setShowBones(on: boolean): this`, `setTint(color | null): this`, `setTextures(t: RigTextures): this`
-    - `jointWorld(name: string): { x: number; y: number }` (screen coordinates)
-    - `container: Phaser.GameObjects.Container`
-    - `destroy()`
-  - `renderPortrait(scene, textures: RigTextures, size: number): string` returns a texture key: a head-and-shoulders crop of the `PORTRAIT_POSE`.
-  - `PORTRAIT_POSE: Pose` (the spike's stance with `head: 0`, `chest: 0`)
+- Consumes: `buildParts`, `paintCommands`, `backTint`, `skeleton`, `LIMB_GROUPS`, `solvePose`, `plantFeet`, `groundOffset`, `bodyDims` (Tasks 1–6); `samplePose`, `heldFrames` (Task 4).
+- Produces:
+  - **Pure (`@web-games/rig`):**
+    - `interface DrawStep { shape: ShapeName; x: number; y: number; r: number; back: boolean; mode: PaintMode }` (joint position and angle relative to the feet point)
+    - `interface FrameJob { key: string; world: World; ground: number; steps: DrawStep[] }`
+    - `planFrames(look: Look, anims: Record<string, Animation>, fps: 15|20|30, stance: Pose): { jobs: FrameJob[]; index: Record<string, { frame: number; job: number }[]> }`
+      - per animation, one entry per `heldFrames` frame
+      - identical poses share one job (`key` = the rounded angles + swaps + plant)
+      - `steps` follow `LIMB_GROUPS`: a group of 2+ bones emits every bone with `mode: "outline"`, then every bone with `mode: "fill"`; a single-bone group emits `"both"`
+      - swaps: `hand: "palm"` → `palm` on both hands, otherwise `fistArmed` on the front hand and `fist` on the back; `face: "hit"` → `headHit`
+      - `plant: ""` frames use the standing pose's ground (Task 3)
+    - `snapToPalette(rgba: Uint8ClampedArray, palette: number[], alphaCut = 120): void`: pixels with alpha < `alphaCut` become fully transparent; the rest become opaque and take the nearest palette color, weighted distance `2·dr² + 4·dg² + 3·db²`, with a per-color cache.
+    - `packCells(sizes: { w: number; h: number }[], pageSize = 2048): { page: number; x: number; y: number }[]`: shelf packing, 1 px gap, a new page when one is full.
+  - **Canvas (`@web-games/rig/canvas`):**
+    - `interface BakedFrame { page: number; x: number; y: number; w: number; h: number; footX: number; footY: number; joints: Record<"head"|"fH"|"bH", { x: number; y: number }> }` (`footX/footY` = the feet point inside the cell, in pixels; joints in art units relative to the feet)
+    - `interface BakedFighter { pages: HTMLCanvasElement[]; frames: BakedFrame[]; index: Record<string, { frame: number; job: number }[]>; colors: number; ms: number }`
+    - `bakeFighter(look: Look, anims: Record<string, Animation>, opts?: { fps?: 15|20|30; scale?: number; overrides?: Partial<Record<ShapeName, CanvasImageSource>> }): BakedFighter` (`scale` default 0.4)
+  - **Phaser (`@web-games/rig/phaser`):**
+    - `addBakedTextures(scene, key: string, baked: BakedFighter): void`: one canvas texture per page (`key + "-p" + n`), with frame `i` added on its page
+    - `removeBakedTextures(scene, key: string): void`
+    - `class FighterSprite`:
+      - `constructor(scene, key: string, baked: BakedFighter)`
+      - `show(anim: string, frame: number): this` (looks up `index` with `shownFrame`)
+      - `setFacing(f: 1 | -1)`, `setPosition(x, y)` (the feet point, world units), `setTint(color | null)`, `setBaked(key, baked)`
+      - `jointWorld(name: "head"|"fH"|"bH"): { x: number; y: number }` (world units: joint × 0.8, mirrored by facing)
+      - `image: Phaser.GameObjects.Image`, `destroy()`
+    - `renderPortrait(scene, look: Look, size: number): string`: bakes one `PORTRAIT_POSE` frame at scale 0.8, crops the head and shoulders, and returns a texture key.
+    - `PORTRAIT_POSE: Pose` (the spike's stance with `head: 0`, `chest: 0`)
 
-- [ ] **Step 1: Write a failing test.** `textureLayout({x0:-10,y0:-20,x1:30,y1:40}, 12)` gives `width === 64`, `height === 84`, `offsetX === 22`, `offsetY === 32`, `originX === 22/64` and `originY === 32/84`.
-- [ ] **Step 2:** Run the test. Expected: FAIL.
+- [ ] **Step 1: Write failing tests.**
+  - **`snapToPalette`:** a 3-pixel buffer `[(250,10,10,255), (10,10,240,200), (0,0,0,50)]` with palette `[0xff0000, 0x0000ff]` becomes `[(255,0,0,255), (0,0,255,255), (·,·,·,0)]`. After snapping, every opaque pixel's color is in the palette.
+  - **`packCells`:**
+    - 300 cells of 100×120 at page size 2048 fit on 1 page with no two rectangles overlapping, all inside 2048×2048;
+    - 400 cells spill onto page 2;
+    - a cell bigger than the page throws an `Error` that says so.
+  - **`planFrames`:**
+    - a 3-key animation (4/2/6 frames) at fps 20 yields index frames `[0, 3, 4, 6, 9]`;
+    - two animations that share an identical pose share one job;
+    - the first steps of every job are `bUA`, `bFA`, `bH` with `mode: "outline"`, then those three with `"fill"`; `knot` and `head` appear once each with `"both"`;
+    - a `plant: ""` pose and the stance have the same `ground`;
+    - `hand: "palm"` gives `palm` on both hand bones.
+- [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3: Implement.**
-  - **Textures:** `buildRigTextures` draws each part's `DrawCmd[]` into a `scene.make.graphics({}, false)` after `translateCanvas(offsetX, offsetY)`, then calls `generateTexture(id + name, w, h)` and destroys the graphics.
-  - **Overrides:** an override image is used instead of the drawn part. It is scaled to fit the part's bbox (contain), with its origin at the joint position.
-  - **`RigSprite` drawing:**
-    - one `Image` per bone in skeleton order; back bones tinted `0xa9aed0`
-    - `setPose` runs `solvePose` and `groundOffset`, then positions and rotates the images exactly as the spike's `render()`
-    - `pose.hand === "palm"` swaps both hand bones to `palm`; otherwise the front hand uses `fistArmed` and the back hand `fist`
-    - `pose.face === "hit"` swaps `head` to `headHit`
-  - **`RigSprite` facing:** `setFacing` sets container scaleX to ±1.
-  - **Portraits:** `renderPortrait` draws a temporary `RigSprite` into a `RenderTexture`, cropped from the chest bottom to the top of the head bbox, saves it with `saveTexture(key)`, and destroys the temporary objects.
-- [ ] **Step 4:** Run `npm test -w lib/rig && npm run typecheck`. Expected: PASS. Rendering is checked visually in Task 8.
-- [ ] **Step 5:** Commit: `feat(rig): add Phaser textures, RigSprite and portraits`.
+  - **`bakeFighter`** follows the spike's `bakeFighter`:
+    - draw each job into a scratch canvas with `setTransform(scale, 0, 0, scale, …)`, then per step translate to the joint, rotate, and play `paintCommands(shape, step.mode)`;
+    - multiply every stroke width by `0.5 / scale`, so outlines stay about 2.5 px at any scale;
+    - back bones' colors go through `backTint`;
+    - the palette is every color the commands used;
+    - `snapToPalette` the scratch pixels, trim to the opaque bounding box, then `packCells` and copy into pages.
+  - **Overrides:** an override image replaces a shape. It's drawn scaled to fit that shape's `bbox` (contain), with its origin at the joint, then snapped to the palette with everything else.
+  - **`FighterSprite`:** one `Image`, scale `(2 × facing, 2)`, origin at `footX/w, footY/h` of the current frame; the position is rounded to even world units, so it lands on whole pixels.
+- [ ] **Step 4:** Run `npm test -w lib/rig && npm run typecheck`. Expected: PASS. Baking is checked visually in Task 8.
+- [ ] **Step 5:** Commit: `feat(rig): bake palette-locked sprite sheets and show them in Phaser`.
 
 ### Task 8: Game scaffold, `Fighter`, roster loader, character files, rig viewer
 
@@ -419,7 +481,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 - Test: `flynn-family-fighters/tests/fighter.test.ts`, `tests/roster.test.ts`
 
 **Interfaces:**
-- Consumes: `Look`, `normalizeLook`, `alternateColors` (Task 2); `@web-games/rig/phaser` (Task 7).
+- Consumes: `Look`, `normalizeLook`, `alternateColors` (Task 2); `bakeFighter` (`@web-games/rig/canvas`) and `FighterSprite` (`@web-games/rig/phaser`) (Task 7).
 - Produces:
   - **Types and limits:**
     - `type MoveType = "fireball"|"uppercut"|"spin-kick"|"charge-dash"|"flip-kick"|"rapid-hits"|"command-throw" | (string & {})`
@@ -446,7 +508,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
     | `throwTechEnabled` | false | |
     | `motionWindowFrames` | 20 | 10–40 |
     | `showHitboxes` | false | |
-    | `pixelFilter` | true | |
+    | `animationFps` | 20 | 15, 20 or 30 (others snap to the nearest) |
 
     Follow `super-flynn-bros/src/settings.ts` (`mySettings` + `clampSettings` + limits).
 - **Package files:**
@@ -457,7 +519,9 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - Ryan: `FASTBALL` fireball, plus `spin-kick` named `BASE STEALER`
   - Stats near 5. Win quotes: Colin "Race you home!", Ryan "Too slow, bro!".
   - Each file has friendly comments, as in the spec's example.
-- **Viewer:** `ViewerScene` loads when the URL has `?viewer`. It shows every roster fighter in a row, cycling stance/idle/walk. Keys: `B` toggles bones, `P` toggles the pixel filter.
+- **Viewer:** `ViewerScene` loads when the URL has `?viewer`. It bakes and shows every roster fighter in a row, cycling stance/idle/walk.
+  - Keys: `C` toggles a 3× close-up of the current frame; `F` cycles `animationFps` (rebakes).
+  - It prints each fighter's frame count, color count and bake time.
 
 - [ ] **Step 1: Write failing tests.**
   - **`normalizeFighter`:**
@@ -477,7 +541,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 - [ ] **Step 4:** Run `npm install && npm test && npm run typecheck` at the root. Expected: PASS.
 - [ ] **Step 5: Manual check.**
   - Run `npm run dev -w flynn-family-fighters` and open `http://localhost:8002/?viewer`.
-  - Expected: Colin and Ryan look like the spike: idle bob, walk cycle, bones overlay, and the pixel filter toggle.
+  - Expected: Colin and Ryan look like the v3 spike: chunky pixels with no blur, one outline per limb (no seams at elbows or knees), both feet on the floor, clean faces, the neck behind the collar, idle bob and walk cycle with held frames.
   - Then edit `colin.ts` hair color → hot reload shows it.
   - Then set `hair.style: "mohawk"` → the default hair shows, plus a console warning.
 - [ ] **Step 6:** Commit: `feat(fighters): scaffold game with roster loader, Colin, Ryan and rig viewer`.
@@ -535,7 +599,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 - Produces:
   - `type Box = { x: number; y: number; w: number; h: number }` (relative to the fighter's feet; +x = forward; y up is negative)
   - `types.ts` also declares `AttackData` and `ActiveAttack` (fields listed in Task 11), so `FighterState` can reference them. Task 11 fills in the data and the logic.
-  - `type FState = "idle"|"walkF"|"walkB"|"crouch"|"jumpSquat"|"jump"|"attack"|"hitstun"|"blockstun"|"knockdown"|"getup"|"dizzy"|"throwing"|"thrown"|"ko"|"win"`
+  - `type FState = "idle"|"walkF"|"walkB"|"crouch"|"guard"|"jumpSquat"|"jump"|"attack"|"hitstun"|"blockstun"|"knockdown"|"getup"|"dizzy"|"throwing"|"thrown"|"ko"|"win"` (`guard` with `crouching` true is the crouching guard)
   - `interface FighterState { fighter: Fighter; x; y; vx; vy; facing: 1|-1; health; maxHealth; state: FState; stateFrame: number; attack: ActiveAttack | null; hitstop: number; stun: number; stunDecayDelay: number; comboHits: number; projectileOut: boolean; history: InputHistory; roundWins: number; crouching: boolean; airborne: boolean; jumpDir: -1|0|1 }`
   - `interface MatchState { frame: number; phase: "intro"|"fight"|"ko"|"roundOver"|"matchOver"; phaseFrame: number; round: number; timerFrames: number; fighters: [FighterState, FighterState]; projectiles: Projectile[]; rng: Rng; settings: FightSettings; stage: { left: number; right: number; ground: number } }`
   - `type MatchEvent = { type: "round"|"fight"|"hit"|"block"|"whiff"|"special"|"projectile"|"throw"|"knockdown"|"dizzy"|"ko"|"timeOver"|"roundOver"|"matchOver"|"draw"; player?: 0|1; x?: number; y?: number; name?: string; damage?: number }`
@@ -543,15 +607,16 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - `stepMatch(s: MatchState, inputs: [InputFrame, InputFrame]): MatchEvent[]`
   - `class Rng { constructor(seed: number); next(): number; int(lo, hi): number }` (mulberry32)
   - `type FightSettings` = the settings fields the engine reads (round time, rounds, damage scale, chip fraction, dizzy on, tech on, motion window).
-- **Movement numbers** (starting values; tune by playing):
+- **Movement numbers** (from the v3 spike, checked by simulation for every `jump` stat; tune by playing, but the corner test below must stay green):
   - Walking: forward `1.5 + 0.25*speed` px/frame; back = 0.8 × forward.
   - Jumps:
-    - a 4-frame `jumpSquat`, then `vy = -(14 + 0.6*jump)`, gravity 0.8/frame²
-    - `vx = ±3.5` for diagonal jumps
+    - a 4-frame `jumpSquat`, then `vy = -(15 + 0.25*jump)`, gravity 0.9/frame² (peak about 129–170 px, 34–39 frames in the air)
+    - `vx = ±6.5` for diagonal jumps (about 220–250 px of travel)
     - jumps can't be steered in the air
   - Crouching: holding any down direction (1, 2 or 3) while grounded.
-  - Bodies are at least `80 * height` px apart (center to center). When overlapping, both are pushed apart evenly; at a wall, the other one moves.
-  - Facing updates only while grounded and not attacking or in stun.
+  - **Pushing:** grounded bodies are at least `PUSH_W = 80 × average height` px apart (center to center). When overlapping, both are pushed apart evenly; at a wall, the other one moves.
+  - **Passing over:** no push while either fighter's `y < -110` (a jumper's feet above the other's waist). On landing, an overlap pushes the two apart toward whichever side each center is on.
+  - **Facing:** updates only while grounded and in `idle`, `walkF`, `walkB`, `crouch` or `guard`.
   - `intro` lasts 90 frames (emits `round` at frame 0 and `fight` at 60); then `fight`.
 
 - [ ] **Step 1: Write failing tests** (helpers build a match with two test fighters and run N frames of inputs):
@@ -562,6 +627,8 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - Corner: P1 at `stage.left` holding LEFT never goes below `left`.
   - Walking into the opponent stops at the minimum distance, and pushes them only if they're walking into you too (no clipping).
   - Cross-over: P1 jumps forward over P2 → after landing, both `facing` values have flipped.
+  - **Corner escape, every jump stat:** for `jump` 1 through 10 (both heights 1.15, the widest push), P1 at `stage.left` and P2 at `left + PUSH_W` → P1 jumps forward and lands with `x > P2.x`, and both facings flipped. The same from the right wall.
+  - A back jump moves away from the opponent and doesn't flip facing.
   - Determinism: two matches with the same seed and inputs have deep-equal state after 300 frames.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3:** Implement `movement.ts` (`updateMovement(f, other, stage)`) and the minimal `stepMatch` (intro → fight; push input into history; movement).
@@ -593,12 +660,16 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - `cr.LK`, `cr.MK` and `cr.HK` are `low`; `cr.HK` knocks down. Jumping normals are `high`.
   - `cl.MP` and `cl.HP` are used within 90 px.
   - `cancellable: true` for `st.LP`, `cr.LP`, `cr.LK`, `cr.MK`, `cl.MP`, `cl.HP`.
-  - Hurtboxes: stand `{x:-40,y:-300,w:80,h:300}`, crouch `{x:-40,y:-200,w:80,h:200}`, air `{x:-40,y:-260,w:80,h:200}`. Scale `y`, `h` and the hitbox reach by the look's height.
+  - Hurtboxes (fighters are drawn at 80% of the art size): stand `{x:-40,y:-250,w:80,h:250}`, crouch `{x:-40,y:-160,w:80,h:160}`, air `{x:-40,y:-230,w:80,h:150}` (relative to the jumper's `y`: legs tucked, so the bottom is 80 above the feet point). Scale `y`, `h` and the hitbox reach by the look's height.
 - **Rules:**
   - **Damage:** `round(base × (0.8 + 0.04×power) × damageScale × (normals override ?? 1))`. Health = `stats.health`.
   - **Blocking:**
-    - The defender blocks if they're holding back (4 = stand block, 1 = crouch block), grounded, and in `idle`/`walkB`/`crouch`/`blockstun`.
+    - The defender blocks if they're holding back (4 = stand block, 1 = crouch block), grounded, and in `idle`/`walkB`/`crouch`/`guard`/`blockstun`.
     - `high` is blocked standing only, `low` crouching only, `mid` either way.
+  - **Guard (proximity guard):**
+    - A fighter holding back (4 or 1) while grounded and free to act enters `guard` (standing or crouching per the direction) instead of walking back, whenever they're **threatened**.
+    - **Threatened** means the opponent has an attack in startup or active frames that hasn't hit, within 300 px, or a projectile of theirs is moving toward this fighter within 360 px.
+    - When no longer threatened, `guard` returns to `idle`/`crouch`. Holding back with no threat is `walkB` as before.
   - **Hitstop:** both fighters freeze for `hitstop` frames (their `stateFrame` doesn't advance).
   - **Pushback:** the defender moves away by `pushback`; if the defender is at a wall, the attacker moves back instead.
   - **Chip:** blocked normals deal 0 chip.
@@ -610,6 +681,11 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - **Hit:** P1 presses LP within range → at frame `startup` (4) a `hit` event fires, P2 health = max − 4 (power 5 → factor 1.0), P2 state `hitstun`, and both have `hitstop === 8`.
   - **Block:** P2 holding back blocks a standing LP → `block` event, no damage, P2 `blockstun`.
   - **Lows and highs:** P2 standing-blocking vs P1's `cr.MK` (low) → hit. P2 crouch-blocking vs P1's `j.HK` (high) → hit.
+  - **Guard:**
+    - P2 holding back with P1 idle at 250 px → P2 is `walkB` and moves back.
+    - P1 starts `st.HP` at 200 px → P2 is in `guard` (not moving) before the first active frame, then blocks it.
+    - With down-back → `guard` with `crouching` true.
+    - Once P1's attack ends and nothing else is coming → P2 returns to `walkB` while still holding back.
   - **Corner:** P2 in the corner gets hit → P1's x moves back by the pushback, and P2's x stays at the wall.
   - **Trade:** both press MP on the same frame at mid range → both take 8 damage on the same step.
   - **Combo:** `cr.LP` → `cr.LP` while the defender is still in hitstun gives `comboHits === 2`.
@@ -681,7 +757,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 
   | Type | Motion | Behavior |
   |---|---|---|
-  | `fireball` | qcf+P | Startup 12. Spawns a projectile from the front-hand height (y −250×k) at speed `[4, 6, 8][s] × choice.speed`. Damage 10, chip = damage × `chipDamageFraction`. Only one per fighter at a time. Recovery 30. |
+  | `fireball` | qcf+P | Startup 12. Spawns a projectile at the front hand's x and a **fixed chest height** (center 120 px above the floor, box 56×56, for every fighter height) at speed `[4, 6, 8][s] × choice.speed`. It hits only when its box overlaps a hurtbox. Damage 10, chip = damage × `chipDamageFraction`. Only one per fighter at a time. Recovery 30. |
   | `uppercut` | dp+P | Invulnerable for frames 0–(4+s). Rises `vy -16 - 2s`, `vx 2`. Damage 12+2s; knocks down. Recovery 28 after landing. |
   | `spin-kick` | qcb+K | Airborne at frame 6. Travels `vx = 5+s` for 30 frames. Hits up to 3 times, damage 5 each (`hasHit` resets every 10 frames). |
   | `charge-dash` | chargeBF+P | Lunges `vx = 9 + s` for 14 frames. Damage 11. |
@@ -700,6 +776,10 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 - [ ] **Step 1: Write failing tests** (each test uses a fighter whose `specials` include the move):
   - **Fireball:** inputs 2, 3, 6+LP → a `projectile` event at frame 12; the projectile travels 4 px/frame; it hits P2 at range for 10 damage; P2 blocking takes `round(10 × 0.25) = 3` chip.
   - **One fireball at a time:** a second fireball input while one is out → no new projectile.
+  - **Dodging** (both fighters height 1; sweep the frame P2 presses jump against an incoming P1 fireball, and count the press frames where P2 takes no damage). The simulation of these rules gave 29+ frames forward and 8–15 straight up vs HP:
+    - forward jump: at least 20 dodging frames, for each speed (LP/MP/HP) and `jump` 1, 6 and 10;
+    - straight-up jump vs an HP fireball: at least 6 dodging frames for `jump` 1, 6 and 10;
+    - crouching: always hit.
   - **Clash:** both throw fireballs → they cancel each other mid-screen, and nobody takes damage.
   - **Uppercut invulnerability:** a dp+HP uppercut started on the same frame P2's `j.HK` would hit → P1 takes no damage during invulnerable frames 0–6.
   - **Charge-dash:** charge back 45 frames, then forward+MP → `vx > 0` lunge, and a hit at range 200.
@@ -760,25 +840,32 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - `ANIMS: Record<string, Animation>` with these keys:
     - movement: `idle`, `walkF`, `walkB`, `crouch`, `jumpSquat`, `jumpUp`, `jumpFwd`, `jumpBack`
     - attacks: one per `NormalId`, `throw`, `thrown`, one per move type
-    - defense: `blockStand`, `blockCrouch`, `hitHigh`, `hitLow`, `knockdown`, `getup`
+    - defense: `guard`, `guardCrouch`, `blockStand`, `blockCrouch`, `hitHigh`, `hitLow`, `knockdown`, `getup`
     - endings: `dizzy`, `ko`, `win`, `lose`
     - `intro`
   - `animFor(f: FighterState): { name: string; frame: number }`: maps state + attack id (+ special type) to an animation and frame. Hit stun uses `hitLow` when the hit was `low`.
-- **Pose sources:** the spike's poses (idle, walk, punch, kick, special, hit, dizzy, win). New poses follow the same conventions:
+- **Pose sources:** the spike's poses: idle, walk, punch, kick, special, hit, dizzy, win, jump, jump kick, `CROUCH`, crouch kick, `GUARD`, guard and block. New poses follow the same conventions:
   - **Knockdown:** the `hips` angle is about −85 (falling backward), with legs extended.
-  - **Crouch:** knees about 90°, `chest` 10.
-  - **Jumps:** knees tucked.
+  - **Crouch:** the spike's `CROUCH` (knees deeply bent; foot planting does the rest).
+  - **Jumps:** the spike's squat → stretch → tuck → open-up keys. Every airborne key has `plant: ""`.
+  - **Guard:** the spike's `GUARD`: fists at the chin, forearms in front of the chest, head tucked, face visible.
+  - **Lifted feet:** walk keys that lift a foot set `plant: "f"` or `"b"`; kicks plant only the standing leg; knockdown keys use `plant: ""`.
   - **Faces and hands:** `face: "hit"` on hits, knockdown, dizzy and KO; `hand: "palm"` during the `fireball` strike and the throw grab.
 
 - [ ] **Step 1: Write failing tests.**
   - For every `NormalId` and move type, `animLength(ANIMS[id]) === startup + active + recovery` of its `AttackData` (strength 1 for specials).
   - For every `FState`, `animFor` returns a name that exists in `ANIMS`.
   - Every pose in `ANIMS`, through `solvePose` with `DEFAULT_LOOK`, gives finite joint positions.
-  - `ANIMS.idle.loop` and `ANIMS.walkF.loop` are true; attacks are not looping.
+  - `ANIMS.idle.loop`, `ANIMS.walkF.loop`, `ANIMS.guard.loop` and `ANIMS.crouch.loop` are true; attacks are not looping.
+  - Every key of `jumpUp`, `jumpFwd` and `jumpBack` after the squat, and every key of every `j.*` normal, has `plant: ""`.
+  - In every grounded animation's poses, after `plantFeet`, each planted ankle is within 1 of the floor.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run the tests. Expected: PASS. Manual: the `?viewer` page gets a list of animation names (cycle with `N`) so you can check every animation on both fighters.
-- [ ] **Step 5:** Commit: `feat(fighters): add full animation set matched to frame data`.
+- [ ] **Step 4:** Run the tests. Expected: PASS.
+- [ ] **Step 5: Manual check.**
+  - The `?viewer` page gets a list of animation names (cycle with `N`) so you can check every animation on both fighters.
+  - The bake stats for the full `ANIMS` stay under 1 s and about 40 MB of pages per fighter at `animationFps` 20. If not, lower the frame count first (share more poses) before shrinking the art.
+- [ ] **Step 6:** Commit: `feat(fighters): add full animation set matched to frame data`.
 
 ### Task 16: Fight scene: rendering, effects, HUD, stages, sound, loop
 
@@ -788,7 +875,7 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
 - Test: `tests/loop.test.ts`, `tests/stages.test.ts`, `tests/controls.test.ts`
 
 **Interfaces:**
-- Consumes: the engine (Tasks 9–14), `ANIMS`/`animFor` (Task 15), `RigSprite` (Task 7), `GameAudio`/`findAllAssets` (`@web-games/audio`), `InputManager` (`@web-games/input`).
+- Consumes: the engine (Tasks 9–14), `ANIMS`/`animFor` (Task 15), `bakeFighter`/`FighterSprite`/`addBakedTextures` (Task 7), `GameAudio`/`findAllAssets` (`@web-games/audio`), `InputManager` (`@web-games/input`).
 - Produces:
   - `stepsToRun(accMs: number, dtMs: number, speed: number): { steps: number; accMs: number }`: step length = `1000 / (60 × [1, 1.15, 1.3, 1.5][speed-1])`; at most 5 steps; the leftover is dropped past the cap.
   - `interface StageDef { id: string; name: string; sky: [string, string]; mountains: string[]; floor: string; floorLines: string; props: ("palms"|"bleachers"|"crowd"|"fence"|"backstop"|"house"|"swings")[] }`, `STAGES: StageDef[]`
@@ -809,14 +896,18 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
     - `ko` → "K.O.!" banner
     - `round` / `fight` → "ROUND N" / "FIGHT!" banners
     - `timeOver` → "TIME!"
-  - **HUD** (second camera): SF2 bars as in the spike, timer (seconds), names, round-win markers, and the combo counter "N HITS!" when ≥ 2.
+  - **HUD** (same camera, pixel art): SF2 bars as in the spike (widths in even world units), timer (seconds), names, round-win markers, and the combo counter "N HITS!" when ≥ 2.
+    - All text uses Press Start 2P at multiples of 16 world units (8 real pixels), at even positions, so glyphs stay crisp.
+    - Boot loads it with `FontFace` from `assets/fonts/PressStart2P-Regular.ttf` and falls back to `monospace` after 2.5 s or on error.
+    - Download the TTF and `OFL.txt` from the Google Fonts GitHub repo (`google/fonts`, `ofl/pressstart2p/`).
   - **Debug:** `showHitboxes` draws hurtboxes (blue) and active hitboxes (red).
-  - **Dizzy:** stars from `effects.ts`.
+  - **Dizzy:** stars from `effects.ts`, placed from `FighterSprite.jointWorld("head")`.
+  - **Effects move in steps:** the spike's solid-ring projectile, starburst sparks (blue on block), stepped dizzy stars and a crowd that bobs 2 px on a timer. No alpha glows.
   - **Mirror match:** when both fighters share an id, P2 uses `alternateColors`.
   - **Boot:**
     - finds optional sounds with `findAllAssets(audioCandidates(…))` and optional part PNGs at `assets/fighters/<id>/<part>.png`, using `findAssets`;
     - loads the roster (`loadRoster`);
-    - builds the textures.
+    - bakes the two fighters of each match (`bakeFighter` with the parts overrides and `animationFps`) and frees the previous match's textures.
   - **`main.ts`:** `?fight=colin,ryan` jumps straight into a CPU-vs-player fight, for testing.
 
 - [ ] **Step 1: Write failing tests.**
@@ -827,11 +918,12 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - **`normalizeStage`:** `normalizeStage({id: "moon", sky: ["nope"]})` → `sky` defaults with a warning, and `props` filters unknown values.
   - **Controls:** the P1 and P2 key sets don't overlap except for shared start/mute keys, and every action from `B` has at least one key per player.
 - [ ] **Step 2:** Run the tests. Expected: FAIL.
-- [ ] **Step 3:** Implement. `FighterView` keeps the previous pose snapshot at each animation change, so `samplePose` blends from it.
+- [ ] **Step 3:** Implement. `FighterView` maps `animFor(state)` to `FighterSprite.show(name, frame)`; it never blends between animations (SF2 frames snap).
 - [ ] **Step 4:** Run `npm test && npm run typecheck`. Expected: PASS.
 - [ ] **Step 5: Manual check.** Open `http://localhost:8002/?fight=colin,ryan`. Expected:
-  - Colin vs CPU Ryan on the track, with the pixel filter and a sharp HUD.
-  - Every normal works; qcf+punch throws DONUT BLAST with its callout; blocking works; dizzy and KO work; rounds advance; time-over works with `roundTime: 30`.
+  - Colin vs CPU Ryan on the track, in chunky 480×270 pixel art with a crisp pixel-font HUD and no blur anywhere.
+  - Every normal works; qcf+punch throws DONUT BLAST with its callout; blocking works, and holding back raises the guard pose as an attack comes in; dizzy and KO work; rounds advance; time-over works with `roundTime: 30`.
+  - Ryan walks you into the corner, and a forward jump gets you out over him. A forward jump clears his fireball.
   - With `showHitboxes: true`, the boxes match the visible limbs closely enough.
 - [ ] **Step 6:** Commit: `feat(fighters): add fight scene with effects, HUD, stages and sound`.
 
@@ -849,12 +941,12 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
   - `afterMatch(f: FlowState, winner: 0|1|"draw"): { next: "versus"|"champ"|"menu"; flow: FlowState }`: in arcade mode a P1 win advances the ladder, the end of the ladder → `champ`, and a loss or draw → `menu`, which offers continue (retry) or quit.
   - `gridLayout(count: number, width = 960): { cols: number; cellSize: number; positions: { x: number; y: number }[] }`
 - **Screens:**
-  - **Title:** "FLYNN FAMILY FIGHTERS" in the arcade-logo style (gradient, outline, shine), over the track stage.
+  - **Title:** "FLYNN FAMILY FIGHTERS" in the arcade-logo style (color bands, outline, shine) in pixel art, over the track stage.
     - Options: `1P ARCADE`, `2P VERSUS`, `QUIT TO ARCADE` (uses `arcadeUrl("flynn-family-fighters", { dev: import.meta.env.DEV })`).
     - The browser Back button restores via `pageshow` with a reload, like the arcade.
   - **Select:**
     - a portrait grid (`renderPortrait`) from `gridLayout`
-    - flashing P1 (blue) and P2 (red) cursors, and a big live `RigSprite` preview of each highlighted fighter in `idle`
+    - flashing P1 (blue) and P2 (red) cursors, and a big live `FighterSprite` preview of each highlighted fighter in `idle` (bake only `idle` and `win` for previews, so moving the cursor stays fast)
     - names, the specials' names, and roster `problems` listed in a friendly box ("broken.ts has a problem: …")
     - in arcade mode only P1 picks; in versus each player confirms with their own start/punch button
     - zero fighters → a friendly message explaining how to add one (`/add-fighter`, or copy `colin.ts`)
@@ -916,14 +1008,14 @@ MODIFY: package.json (workspaces), docker-compose.yml, docker-compose.prod.yml, 
     - How It Works (the rig, the simulation, data-driven moves, with file links)
     - Make It Your Own:
       - getting started
-      - easy tweaks (settings names with values to try)
+      - easy tweaks (settings names with values to try, including `animationFps`)
       - make yourself a fighter (`/add-fighter` or copy `colin.ts`; every `Look` field explained)
       - draw your own head (PNG overrides: path, part names, any size scales to fit)
       - add a stage, rename and recolor your special, faster fireballs
       - challenges: a new move type, a new animation by editing angles
       - sounds (the file list)
       - Oops, I broke it
-    - the multiplayer server isn't used; port 8002; credits (no third-party assets)
+    - the multiplayer server isn't used; port 8002; credits: the Press Start 2P font (CodeMan38, SIL Open Font License 1.1, `public/assets/fonts/OFL.txt`); no other third-party assets
 - [ ] **Step 6:** Run `npm test && npm run typecheck && npm run build`. Expected: PASS.
 - [ ] **Step 7: Docker check.**
   - Run `docker compose up --build -d`.

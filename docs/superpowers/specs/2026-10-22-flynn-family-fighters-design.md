@@ -37,8 +37,8 @@ make their fireball faster, and see it right away.
   - animations are written once and shared by every fighter
 - **An SF2 look, not 8-bit:**
   - big, exaggerated fighter bodies
-  - hard-edged cel shading and thick outlines
-  - an optional arcade pixel filter
+  - real pixel art: each fighter is turned into a palette-locked sprite sheet at low resolution, with held animation frames like SF2
+  - hard-edged cel shading, with one outline per limb in a dark version of that limb's color
   - over-the-top hit effects
   - This rig is the reusable "art upgrade" for future games.
 - **Anyone in the family can be a fighter:** boys and girls, men and women, any size. Body type, fighting style and looks are separate settings that mix freely.
@@ -93,19 +93,25 @@ make their fireball faster, and see it right away.
 
 ## Screen & Look
 
-- **Resolution:** a logical 960×540 canvas with `Scale.FIT` and WebGL.
-- **Fighter style** (proven in the spike, see "Reference Spike" below):
-  - **SF2 proportions:** fighters are big, about 55–60% of screen height, with broad shoulders, narrow waists, thick forearms, square jaws and heavy brows. The feminine frame is athletic in the same spirit.
-  - **Cel shading:** each part gets a thick dark outline, a base color, two hard-edged shadow steps and one highlight band. There are no gradients.
-  - **Back limbs** are tinted darker, so the near and far side read clearly.
-- **Arcade pixel filter:** a camera pixelate effect (`PIXEL_FILTER` in settings, on by default) gives the chunky arcade look.
-  - The HUD and text are drawn by a second camera without the filter, so they stay sharp.
+- **Resolution:** the game world is laid out in 960×540 units but drawn at **480×270 real pixels**, scaled up 2× with no smoothing (`pixelArt: true`, a camera zoom of 0.5). Everything, the HUD included, is chunky pixel art. *(Changed after the v3 spike: a light pixelate filter over smooth art still read as vector art.)*
+- **Fighter style** (proven in the v3 spike, see "Reference Spike" below):
+  - **SF2 proportions:** wide shoulders, narrow waists, thick forearms, huge fists and feet, square jaws and heavy brows. The feminine frame is athletic in the same spirit.
+  - **Size:** a standing fighter is about 50% of the screen's height. That leaves room to jump over each other (SF2's fighters are about 42%). Going smaller would cost face detail, which matters for recognizing family members.
+  - **Cel shading:** a base color, two hard-edged shadow steps and one highlight band, with no gradients. Shadows lean purple and highlights lean warm, as in SF2.
+  - **Outlines:** each limb (arm, leg, torso, head) has **one** outline around its whole silhouette, so no seams show between the pieces inside a limb. Outlines appear only between limbs, such as an arm crossing the chest. An outline is a dark version of the color it surrounds, not black.
+  - **Locked palette:** every pixel of a fighter snaps to that fighter's own colors, so no blurry in-between shades survive.
+  - **Back limbs** use the same colors a step darker, so the near and far side read clearly.
+  - **Faces:** no box drawn around the eyes (it reads as glasses); the heavy brow doubles as the upper eyelid. The nose shares the face's outline. The ear is a darker patch with no outline of its own. No loose lines.
+  - **Neck:** drawn with the torso, behind the traps and collar, so it grows out of the body instead of being pasted on top.
+- **Held animation frames:** animations play like SF2, holding each frame for a few game frames rather than tweening smoothly. 20 frames per second by default (`ANIMATION_FPS`: 15, 20 or 30). Strike frames always show.
 - **Over-the-top effects:**
   - hit pause, with the defender shaking
   - starburst hit sparks
   - screen shake
-  - a glowing special projectile in the fighter's special color, and the special's name shouted on screen
+  - a special projectile in solid rings of the fighter's special color, and the special's name shouted on screen
   - big "K.O.!" banners
+  - effects (sparks, projectiles, dizzy stars, the crowd) move in steps, not smooth glides, to match the held frames
+- **HUD text** uses a pixel font drawn at its native size, so letters stay crisp at 480×270. *(My call: Press Start 2P, SIL Open Font License, self-hosted in `public/assets/fonts/` and credited in the README. Text falls back to monospace if it's missing.)*
 - **Stage style:** bright and saturated, SF2-style: sunset skies, layered mountains, palm trees, and a crowd that bobs.
 - **HUD (SF2 layout):**
   - top row: two health bars, the round timer in the middle, and names under the bars
@@ -165,9 +171,11 @@ make their fireball faster, and see it right away.
 - Walking:
   - forward and back walk speeds come from the fighter's `speed` stat
   - back walk is slower
-- Crouching.
-- Jumps go straight up, forward or back, with a fixed arc. Jump height comes from the `jump` stat.
-- Fighters push each other and can't pass through each other. The camera and the stage edges keep both on screen.
+- Crouching: hold any down direction.
+- Jumps go straight up, forward or back, with a fixed arc you can't steer. Jump height comes from the `jump` stat.
+- **Jumping out of the corner must always work.** A forward jump carries a fighter over an opponent standing right next to them, even with their back to the wall, for every `jump` stat (1–10). Otherwise a player can be pinned in the corner with no escape. (Proven in the v3 spike.)
+- **Pushing:** standing fighters push each other apart and can't overlap. A jumper passes over once their feet are above the other fighter's waist, then lands on the far side. The stage edges keep both on screen.
+- **Facing:** whenever a fighter is standing, crouching or guarding, they turn to face the opponent, so both turn around after a cross-over.
 
 ### Attacking
 - **Normal attacks:** each button has a standing, crouching and jumping version, which makes 18 normal attacks.
@@ -182,10 +190,15 @@ make their fireball faster, and see it right away.
 
 ### Getting hit
 - **Hit pause:** both fighters freeze for a few frames on contact, then the defender is in hit stun.
-- **Blocking:** hold back while standing or crouching.
+- **Blocking:** hold back (away from the opponent) while standing or crouching.
   - Standing blocks high and mid attacks; crouching blocks low and mid attacks.
   - Jump-ins hit high, sweeps hit low.
   - Blocking puts the defender in block stun and pushes them back.
+  - **Guard pose (proximity guard):** holding back while an attack is coming (an opponent's attack starting nearby, or their projectile headed your way) stops you and raises your guard *before* it lands, standing or crouching. With nothing coming, holding back just walks you backward. The guard pose keeps the face visible: fists up at the chin, forearms in front of the chest.
+- **Dodging projectiles:** projectiles fly at a fixed chest height and only hit what they touch.
+  - Jumping forward over one always works with comfortable timing.
+  - Jumping straight up clears only fast ones, with tighter timing.
+  - Crouching doesn't dodge them, as in SF2.
 - **Chip damage:** blocked special moves deal a small part of their damage (`CHIP_DAMAGE_FRACTION`).
 - **Knockdowns:** sweeps, throws and some specials knock down. The fighter can't be hit while on the floor, then gets up.
 - **Dizzy:** taking enough damage quickly (a hidden stun meter that drains over time) makes the fighter dizzy for a short time, with stars over the head.
@@ -213,7 +226,7 @@ Every attack (normal, throw or special) is one data entry. Each has:
 - **Moving the fighter:** an optional projectile spawn, and optional movement (an uppercut rises, a spin kick travels).
 
 ### Hit boxes come from data, not from the art
-- Each fighter's hurt boxes are a few rectangles (standing, crouching, jumping, and per attack).
+- Each fighter's hurt boxes are a few rectangles (standing, crouching, jumping, and per attack). The jumping box is short and raised, because the legs are tucked.
 - They scale slightly with `height`, so a tall fighter is a bigger target with a little more reach. *(My call. This makes looks and gameplay match a bit without letting looks dominate.)*
 - `settings.ts` has `SHOW_HITBOXES`, a debug view kids will love.
 
@@ -296,15 +309,19 @@ Following §7 swappable art, a kid can drop a PNG into `public/assets/fighters/<
 
 ## `lib/rig`: Paper-Doll Characters
 
-**Skeleton.** A fixed skeleton of 17 bones, as in the spike:
+**Skeleton.** A fixed skeleton of 18 bones, as in the v3 spike:
 - **Root:** the hips, with a belt-knot bone.
-- **Upper body:** a waist and a chest (two bones, so the spine can bend), then the head.
+- **Upper body:** a waist and a chest (two bones, so the spine can bend), then the neck and head. The neck turns with the head.
 - **Arms:** upper arm, forearm and hand on each side.
 - **Legs:** thigh, shin and foot on each side.
 
 Bone lengths and widths come from `height`, `build`, `muscle` and `body`.
 
-**Feet stay on the floor.** After each pose the rig finds the lower foot and puts it on the ground, so poses never have to say how high the body is (except jumps).
+**Feet are planted on the floor.** After each pose, the rig bends the hip and knee of every planted leg so its ankle lands exactly on the floor, the way 3D games plant feet. So poses never have to say how high the body is, and a back foot never floats. *(Changed after the v3 spike: grounding by the lower foot alone left the back foot hovering.)*
+- A keyframe says which feet are planted with `plant`: `"fb"` (both, the default), `"f"`, `"b"` or `""`. A walk step or a kick lifts one foot.
+- **In the air** (`plant: ""`), the body keeps its standing height, and the jump arc lifts it.
+
+**Limb groups.** Pieces are drawn in limb groups, back to front: back arm, back leg, hips with front leg, torso (neck, waist, chest), belt knot, head, front arm. Inside a group, every piece's outline is drawn first and then every fill, so the group has one silhouette outline.
 
 **Body frames** (`body`). Each frame is a proportion table:
 - **Masculine:** wide shoulders, narrow waist, thick neck, big hands, square jaw.
@@ -332,17 +349,20 @@ Both mix with every archetype, height, build and muscle value. New frames can be
 
 Starter set *(my call)*: everything the spike has, plus the feminine frame, about 8 hairstyles, a face library big enough that the first several family members look different from each other, and about 6 extras. Adding a part = adding one entry.
 
-**How parts are drawn (proven in the spike).**
+**How parts are drawn (proven in the v3 spike).**
 - **Shapes:** every shape is a polygon. Ellipses become polygons too.
 - **Paint passes:**
-  1. a thick outline pass for all outlined shapes, so overlapping shapes merge into one silhouette
+  1. an outline pass, in a dark version of each shape's color, so overlapping shapes merge into one silhouette (per limb group, above)
   2. a fill pass
   3. cel shading made by clipping each polygon against a half-plane, for the shadow, deep-shadow and highlight bands
   4. detail lines (muscle lines, folds, knuckles)
-- **Textures:** at startup each fighter's parts are drawn once into textures (`generateTexture`). Each part draw function returns its own bounding box, so the joint position becomes the sprite's origin.
-- **On screen:** a fighter is a Phaser Container of part sprites, one per bone, positioned with forward kinematics each frame. Only sprites move and rotate; nothing is redrawn. The container's x-scale flips the fighter to face left.
+- **Baking sprite sheets:** when a fighter is needed (the two in a match, or the select screen preview), every animation is posed frame by frame and drawn with Canvas 2D at low resolution. Then every pixel is snapped to the fighter's palette, soft edges are dropped, and the frames are packed into sprite-sheet pages.
+  - Only held frames are drawn: every Nth game frame for the animation's fps, plus each keyframe's first frame, so strike frames always appear.
+  - Frames are trimmed to their content, and identical poses are shared.
+  - Baking takes about 0.1 s per 100 frames in the spike. A fighter is re-baked when its file changes (hot reload).
+- **On screen:** a fighter is one Phaser image showing the current baked frame. It's flipped with a scale of −1 to face left, which stays pixel-exact. Each baked frame keeps its joint positions, so effects (projectile spawns, dizzy stars) know where the hands and head are.
 
-**Swaps per keyframe.** A keyframe can swap a part's texture for that moment:
+**Swaps per keyframe.** A keyframe can swap a part for that moment:
 - hands: fist or open palm
 - face: normal, hit, or (later) yell and win
 - This is the cheapest way to make moves read like hand-drawn SF2 frames. Add more swaps where a move needs them.
@@ -352,18 +372,19 @@ Starter set *(my call)*: everything the spike has, plus the feminine frame, abou
 **Poses and animations.**
 - A pose is a list of joint angles plus a hips offset.
 - An animation is a list of keyframes: pose plus how many frames to hold it.
-- In-between frames come from easing between keyframes. Snapping is an option per keyframe, for crisp hit frames.
+- In-between poses come from easing between keyframes; they're baked as held frames (above). Snapping is an option per keyframe, for crisp hit frames.
+- A new animation starts from its own first keyframe instead of blending from the previous pose, as SF2 frames snap.
 - `lib/rig` knows nothing about fighting; it just plays named animations.
 
 **Fighter animations** live in the game (`src/animations.ts`), all written once and shared by every character:
 - movement: idle, walk forward, walk back, crouch, jump (three directions)
 - the 18 normal attacks, throws, and one per move type
-- defense: block (standing and crouching), hit (high and low), knockdown, get up
+- defense: guard (standing and crouching), block (standing and crouching), hit (high and low), knockdown, get up
 - endings: dizzy, win, lose
 
 A kid can tweak a punch by editing angles.
 
-**Portraits** use the same rig with a close-up pose and a crop.
+**Portraits** use the same rig and baking, with a close-up pose, a crop and a larger pixel size.
 
 ## `/add-fighter` Skill
 
@@ -393,6 +414,7 @@ Lives in `.claude/skills/add-fighter/SKILL.md`, checked in, so anyone working in
 - **Match:** `ROUND_TIME`, `ROUNDS_TO_WIN`, `GAME_SPEED`, `CPU_DIFFICULTY`
 - **Combat:** `DAMAGE_SCALE`, `CHIP_DAMAGE_FRACTION`, `DIZZY_ENABLED`, `THROW_TECH_ENABLED`
 - **Input and debug:** `MOTION_WINDOW_FRAMES`, `SHOW_HITBOXES`
+- **Look:** `ANIMATION_FPS` (15 choppy, 20 SF2-ish, 30 smoother)
 - **Controls:** the key and button bindings
 
 Every value has a comment with a safe range and is clamped.
@@ -414,11 +436,12 @@ Every value has a comment with a safe range and is clamped.
   - is deterministic (no `Math.random` inside the logic; it uses a seeded random), which keeps online play possible later
 - **Vitest** tests the pure logic:
   - motion reading, including leniency and facing flips
-  - high/low/mid blocking
+  - high/low/mid blocking, and the guard pose (holding back walks unless an attack is coming)
+  - jumping out of the corner for every `jump` stat, and jumping over projectiles
   - chip damage, throw rules, cancel windows and dizzy
   - round and time-over outcomes
   - character file validation and clamping
-  - rig bone-length math
+  - rig bone-length math, foot planting, and palette snapping
 - **Phaser scenes** only draw state and play animations.
 - **Audio:** optional hit, block, KO, announcer and music files through `lib/audio`, listed in the README.
 
@@ -428,10 +451,16 @@ Build on a feature branch. Pushes to `main` publish images and appear in the liv
 
 ## Reference Spike
 
-`docs/superpowers/specs/2026-10-22-flynn-family-fighters-spike.html` is the throwaway prototype this design was approved from.
-- **What it shows:** Colin vs Ryan with idle, walk, punch, kick, special, hit, dizzy and win; the cel-shaded parts; the pixel filter with an unfiltered HUD camera; and a live character-file editor.
-- **How to run it:** put Phaser's `phaser.min.js` next to it (copy from `node_modules/phaser/dist/`) and serve the folder.
-- **It's a reference for look and feel, not code to keep.** Its shapes, colors and poses are a good starting point for the real parts library and animations.
+Two throwaway prototypes sit next to this spec. **v3 is the reference; v2 is history.**
+- **`2026-10-25-flynn-family-fighters-spike-v3.html` (the reference):** the pixel-art version.
+  - **Drawing:** baked palette-locked sprite sheets; limb-group outlines; foot planting; the face and neck fixes; fighters at 80% of the v2 size.
+  - **Movement:** jumps and jump kicks; corner escapes with push-apart and turning around; crouching and a low kick.
+  - **Combat:** body boxes for projectiles; blocking high, mid and low, with chip damage; the guard pose; Ryan walking forward and blocking.
+  - **Tools:** close-up and hurtbox views, and a live character-file editor.
+  - Its numbers (jump arc, push width, fireball height, body boxes) are the starting values in the plan.
+- **`2026-10-22-flynn-family-fighters-spike.html` (v2):** the smooth cel-shaded version this design was first approved from, with a light pixel filter.
+- **How to run them:** put Phaser's `phaser.min.js` next to them (copy from `node_modules/phaser/dist/`) and serve the folder.
+- **They're references for look and feel, not code to keep.** Port shapes, colors, poses and rules from v3.
 
 ## Left to the Builder
 
@@ -440,7 +469,7 @@ Build on a feature branch. Pushes to `main` publish images and appear in the liv
 - Part shapes and drawing details, within the style above.
 - Stage art.
 - Internal module layout beyond the files named here.
-- Whether `lib/rig` easing uses Phaser tweens or its own math. It must stay frame-exact in step with the simulation.
+- How baked frames are packed into pages, as long as a fighter's frames stay within WebGL's texture-size limits and the frame shown always matches the simulation's frame exactly.
 - Build order. A sensible path:
   1. rig plus a posing viewer
   2. movement and normal attacks
