@@ -12,3 +12,6 @@ export { weaponShape } from "./parts/weapons";
 export { headPart } from "./parts/head";
 export { HAIR_FRONT } from "./parts/hair";
 export { buildParts, type ShapeName } from "./parts/index";
+export { planFrames, STANCE, type DrawStep, type FrameJob, type FrameIndex } from "./bake/plan";
+export { snapToPalette } from "./bake/quantize";
+export { packCells } from "./bake/pack";
