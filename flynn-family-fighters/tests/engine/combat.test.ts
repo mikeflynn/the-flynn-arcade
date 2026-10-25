@@ -40,9 +40,9 @@ const P2_DOWN_BACK = B.DOWN | B.RIGHT;
 
 describe("moves table", () => {
   it("uses the starter frame data", () => {
-    expect(NORMALS["st.LP"]).toMatchObject({ startup: 4, active: 3, recovery: 7, damage: 4, hitstun: 12, blockstun: 8, hitstop: 8 });
-    expect(NORMALS["st.MP"]).toMatchObject({ startup: 6, active: 4, recovery: 12, damage: 8, hitstun: 16, blockstun: 12, hitstop: 10 });
-    expect(NORMALS["st.HP"]).toMatchObject({ startup: 9, active: 4, recovery: 20, damage: 12, hitstun: 20, blockstun: 16, hitstop: 12 });
+    expect(NORMALS["st.LP"]).toMatchObject({ startup: 4, active: 3, recovery: 7, damage: 4, hitstun: 16, blockstun: 8, hitstop: 8 });
+    expect(NORMALS["st.MP"]).toMatchObject({ startup: 6, active: 4, recovery: 12, damage: 8, hitstun: 18, blockstun: 12, hitstop: 10 });
+    expect(NORMALS["st.HP"]).toMatchObject({ startup: 9, active: 4, recovery: 20, damage: 12, hitstun: 22, blockstun: 16, hitstop: 12 });
     expect(NORMALS["cr.HK"]).toMatchObject({ level: "low", knockdown: true });
     expect(NORMALS["cr.LK"].level).toBe("low");
     expect(NORMALS["cr.MK"].level).toBe("low");
@@ -145,8 +145,10 @@ describe("hits", () => {
     run(s, 1);
     expect(p1.state).toBe("idle");
     expect(p1.attack).toBeNull();
-    expect(p2.state).toBe("hitstun"); // hitstun 12 counts from the hit: 10 steps so far
-    run(s, 2);
+    expect(p2.state).toBe("hitstun"); // hitstun 16 counts from the hit: 10 steps so far
+    run(s, 5);
+    expect(p2.state).toBe("hitstun");
+    run(s, 1);
     expect(p2.state).toBe("idle");
   });
 
@@ -319,18 +321,36 @@ describe("pushback, trades and combos", () => {
     expect(s.fighters[1].state).toBe("hitstun");
   });
 
-  it("a second hit while the defender is still in hitstun counts as a combo", () => {
+  // Light hitstun 16 vs cr.LP: hit on step 4, hitstop steps 5..12, the attack is free
+  // on step 22, and the defender's hitstun runs out on step 28. The second cr.LP hits
+  // 4 steps after its press, so presses on steps 22 and 23 combo (one frame to spare).
+  function crLpTwice(secondPress: number): { s: MatchState; events: (MatchEvent & { step: number })[] } {
     const s = newMatch(400, 500);
-    const p2 = s.fighters[1];
-    run(s, 5, B.DOWN | B.LP);
-    expect(p2.comboHits).toBe(1);
-    p2.stateLength = 60; // keep them stunned long enough for the next cr.LP to land
-    let events: MatchEvent[] = [];
-    for (let i = 0; i < 40 && of(events, "hit").length === 0; i++) {
-      events = run(s, 1, i % 2 === 0 ? B.DOWN : B.DOWN | B.LP);
+    const events: (MatchEvent & { step: number })[] = [];
+    for (let step = 0; step < secondPress + 6; step++) {
+      const input = step === 0 || step === secondPress ? B.DOWN | B.LP : B.DOWN;
+      for (const e of stepMatch(s, [input, 0])) events.push({ ...e, step });
     }
-    expect(of(events, "hit")).toHaveLength(1);
-    expect(p2.comboHits).toBe(2);
+    return { s, events };
+  }
+
+  it("cr.LP, cr.LP links: the second press on the first free frame combos", () => {
+    const { s, events } = crLpTwice(22);
+    expect(of(events, "hit").map((e) => e.step)).toEqual([4, 26]);
+    expect(s.fighters[1].comboHits).toBe(2);
+    expect(s.fighters[1].health).toBe(s.fighters[1].maxHealth - 8);
+  });
+
+  it("a press before the attack is over is ignored", () => {
+    const { events } = crLpTwice(21);
+    expect(of(events, "hit").map((e) => e.step)).toEqual([4]);
+  });
+
+  it("cr.LP, cr.LP still combos one frame late, but not two", () => {
+    expect(crLpTwice(23).s.fighters[1].comboHits).toBe(2);
+    const late = crLpTwice(24);
+    expect(of(late.events, "hit").map((e) => e.step)).toEqual([4, 28]);
+    expect(late.s.fighters[1].comboHits).toBe(1);
   });
 
   it("the combo count resets when the defender recovers", () => {

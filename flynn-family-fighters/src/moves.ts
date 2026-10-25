@@ -10,6 +10,8 @@
 //   damage    how much health it takes. Try 1 to 30.
 //   chip      damage that still gets through a block. Normals use 0.
 //   hitstun   frames the other fighter is stunned when it hits. Try 8 to 30.
+//             Light hitstun 16 is just long enough for crouching Light Punch
+//             to hit twice in a row (a combo!). Lower it and that combo breaks.
 //   blockstun frames the other fighter is stuck when they block it. Try 4 to 24.
 //   hitstop   frames both fighters freeze when it connects (that "crunch"!). Try 4 to 16.
 //   dizzy     how much it fills the hidden dizzy meter. Try 0 to 20.
@@ -37,19 +39,19 @@ import type { AttackData } from "./engine/types";
 // 🛠️ TRY THIS: make LIGHT's startup 2 and see how fast jabs come out.
 const LIGHT = {
   startup: 4, active: 3, recovery: 7, damage: 4, chip: 0,
-  hitstun: 12, blockstun: 8, hitstop: 8, dizzy: 6, pushback: 12,
+  hitstun: 16, blockstun: 8, hitstop: 8, dizzy: 6, pushback: 12,
   level: "mid", knockdown: false, cancellable: false,
 } as const;
 
 const MEDIUM = {
   startup: 6, active: 4, recovery: 12, damage: 8, chip: 0,
-  hitstun: 16, blockstun: 12, hitstop: 10, dizzy: 10, pushback: 16,
+  hitstun: 18, blockstun: 12, hitstop: 10, dizzy: 10, pushback: 16,
   level: "mid", knockdown: false, cancellable: false,
 } as const;
 
 const HEAVY = {
   startup: 9, active: 4, recovery: 20, damage: 12, chip: 0,
-  hitstun: 20, blockstun: 16, hitstop: 12, dizzy: 14, pushback: 20,
+  hitstun: 22, blockstun: 16, hitstop: 12, dizzy: 14, pushback: 20,
   level: "mid", knockdown: false, cancellable: false,
 } as const;
 

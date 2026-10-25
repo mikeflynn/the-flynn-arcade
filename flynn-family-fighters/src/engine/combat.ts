@@ -160,7 +160,7 @@ export function updateAttack(s: MatchState, i: 0 | 1, events: MatchEvent[]): voi
     f.attack.frame++;
     // A jump attack holds its pose until the fighter lands (one attack per jump).
     if (f.attack.frame >= totalFrames(f.attack.data) && !f.airborne) endAttack(f, i, events);
-    return;
+    if (f.attack) return; // still busy; otherwise this first free frame can start the next attack
   }
   if (!ATTACK_FROM.includes(f.state)) return;
   const pressed = BUTTONS.find(([bit]) => f.history.pressed(bit));
