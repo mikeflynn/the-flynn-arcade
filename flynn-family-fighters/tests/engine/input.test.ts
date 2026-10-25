@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { B, InputHistory, matchMotion, toDir } from "../../src/engine/input";
+import { B, InputHistory, matchMotion, toDir, type Motion } from "../../src/engine/input";
 
 type Dir = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
@@ -81,6 +81,9 @@ describe("motions", () => {
     };
     expect(matchMotion(mash(5), "mash", 20)).toBe(true);
     expect(matchMotion(mash(4), "mash", 20)).toBe(false);
+  });
+  it("never matches a motion it doesn't know (a typo)", () => {
+    expect(matchMotion(feed([2, 3, 6]), "qcff" as Motion, 20)).toBe(false);
   });
   it("reads 360", () => {
     expect(matchMotion(feed([4, 1, 2, 3, 6, 9, 8]), "360", 20)).toBe(true);

@@ -111,6 +111,7 @@ export class InputHistory {
 }
 
 export type Motion = "qcf" | "qcb" | "dp" | "chargeBF" | "chargeDU" | "mash" | "360";
+export const MOTIONS: readonly Motion[] = ["qcf", "qcb", "dp", "chargeBF", "chargeDU", "mash", "360"];
 
 /** Do these directions show up in order (other directions may sit in between)? */
 function hasSequence(h: InputHistory, seq: Dir[], window: number): boolean {
@@ -154,5 +155,7 @@ export function matchMotion(h: InputHistory, motion: Motion, window: number): bo
       for (let ago = 0; ago < span; ago++) seen.add(h.dirAgo(ago));
       return [4, 2, 6, 8].every((d) => seen.has(d as Dir));
     }
+    default:
+      return false; // a motion we don't know (a typo in moves.ts) never matches
   }
 }

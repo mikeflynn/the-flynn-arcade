@@ -145,8 +145,9 @@ export const NORMALS: Record<NormalId, MoveData> = {
 /** One special move type. */
 export interface MoveTypeDef {
   type: string;
-  motion: Motion;
-  button: "P" | "K";
+  // A typo here won't stop the game from building: you'll get a message in the console (F12).
+  motion: Motion | (string & {});
+  button: "P" | "K" | (string & {});
   /** The attack numbers for strength 0 (light), 1 (medium) or 2 (heavy). */
   attack: (strength: 0 | 1 | 2, choice: SpecialChoice) => MoveData;
   /** Optional: runs every frame of the move (frame counts up from 0). */

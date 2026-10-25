@@ -8,7 +8,7 @@ import {
   activeEnd, applyContact, canBeHit, canBlock, frames, GUARD_FROM, normalizeAttack, overlapOf, sizedHitbox,
   startupOf, worldHurtbox, type WorldBox,
 } from "./combat";
-import { B, matchMotion, type Motion } from "./input";
+import { B, matchMotion, MOTIONS, type Motion } from "./input";
 import { canGrab, grab } from "./throws";
 import type { AttackData, FState, FighterState, MatchEvent, MatchState, Projectile } from "./types";
 
@@ -45,6 +45,52 @@ function moveType(choice: SpecialChoice): MoveTypeDef | undefined {
   return Object.hasOwn(MOVE_TYPES, choice.type) ? MOVE_TYPES[choice.type] : undefined;
 }
 
+/** How many single-letter edits turn a into b (to suggest the motion a typo meant). */
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const up = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = up;
+    }
+  }
+  return row[b.length];
+}
+
+type Checked = { motion: Motion | null; button: "P" | "K" };
+const checkedTypes = new WeakMap<MoveTypeDef, Checked>();
+
+/**
+ * A move type's motion and button, checked once. An unknown motion turns the
+ * move off (with a message suggesting the closest one); an unknown button becomes "P".
+ */
+export function checkMoveType(def: MoveTypeDef, warn: (message: string) => void = warnOnce): Checked {
+  const seen = checkedTypes.get(def);
+  if (seen) return seen;
+  const motion = MOTIONS.find((m) => m === def.motion) ?? null;
+  if (!motion) {
+    const typed = String(def.motion);
+    const closest = [...MOTIONS].sort(
+      (a, b) => editDistance(typed.toLowerCase(), a.toLowerCase()) - editDistance(typed.toLowerCase(), b.toLowerCase()),
+    )[0];
+    warn(
+      `🥊 moves.ts ${def.type}: motion ${JSON.stringify(def.motion)} isn't one we know. Did you mean "${closest}"? ` +
+        `(Try: ${MOTIONS.join(", ")}.) This move is off until it's fixed.`,
+    );
+  }
+  let button: "P" | "K" = def.button === "K" ? "K" : "P";
+  if (def.button !== "P" && def.button !== "K") {
+    button = String(def.button).trim().toUpperCase() === "K" ? "K" : "P";
+    warn(`🥊 moves.ts ${def.type}: button should be "P" or "K", not ${JSON.stringify(def.button)}. Using "${button}".`);
+  }
+  const checked = { motion, button };
+  checkedTypes.set(def, checked);
+  return checked;
+}
+
 /** The attack numbers from moves.ts, made safe. A move whose code throws is skipped (with a message) instead of crashing. */
 function attackOf(def: MoveTypeDef, strength: 0 | 1 | 2, choice: SpecialChoice): AttackData | null {
   try {
@@ -70,15 +116,19 @@ function canCancel(f: FighterState): boolean {
 export function trySpecial(s: MatchState, player: 0 | 1): MatchEvent[] | null {
   const f = s.fighters[player];
   if (!canCancel(f) && (f.attack || f.airborne || !SPECIAL_FROM.includes(f.state))) return null;
-  const choices = f.fighter.specials
-    .map((choice) => ({ choice, def: moveType(choice) }))
-    .filter((c): c is { choice: SpecialChoice; def: MoveTypeDef } => c.def !== undefined)
-    .sort((a, b) => MOTION_ORDER.indexOf(a.def.motion) - MOTION_ORDER.indexOf(b.def.motion));
+  const choices: { choice: SpecialChoice; def: MoveTypeDef; motion: Motion; button: "P" | "K" }[] = [];
+  for (const choice of f.fighter.specials) {
+    const def = moveType(choice);
+    if (!def) continue;
+    const { motion, button } = checkMoveType(def);
+    if (motion) choices.push({ choice, def, motion, button });
+  }
+  choices.sort((a, b) => MOTION_ORDER.indexOf(a.motion) - MOTION_ORDER.indexOf(b.motion));
 
-  for (const { choice, def } of choices) {
-    const buttons = def.button === "K" ? KICKS : PUNCHES;
+  for (const { choice, def, motion, button } of choices) {
+    const buttons = button === "K" ? KICKS : PUNCHES;
     const down = f.history.newestPress(buttons[0] | buttons[1] | buttons[2], BUTTON_BUFFER_FRAMES);
-    if (!down || !matchMotion(f.history, def.motion, s.settings.motionWindowFrames)) continue;
+    if (!down || !matchMotion(f.history, motion, s.settings.motionWindowFrames)) continue;
     const strength = ([2, 1, 0] as const).find((n) => (down & buttons[n]) !== 0) ?? 0;
     const data = attackOf(def, strength, choice);
     if (!data) continue;

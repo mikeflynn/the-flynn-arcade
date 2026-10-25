@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MOVE_TYPE_NAMES, normalizeFighter, type Fighter } from "../../src/fighter";
 import { B, type InputFrame } from "../../src/engine/input";
 import { createMatch, stepMatch } from "../../src/engine/match";
 import { trySpecial } from "../../src/engine/specials";
 import type { MatchEvent, MatchState } from "../../src/engine/types";
-import { KNOWN_MOVE_TYPES } from "../../src/moves";
+import { KNOWN_MOVE_TYPES, MOVE_TYPES, type MoveTypeDef } from "../../src/moves";
 import { mySettings } from "../../src/settings";
 
 type Opts = { specials?: unknown[]; height?: number; jump?: number; known?: string[] };
@@ -343,11 +343,60 @@ describe("other move types", () => {
 });
 
 describe("forgiving", () => {
-  it("trySpecial ignores a special whose type isn't a move type", () => {
-    const s = newMatch(300, 660, { specials: [{ type: "laser", name: "ZAP" }], known: [...MOVE_TYPE_NAMES, "laser"] });
-    expect(s.fighters[0].fighter.specials).toMatchObject([{ type: "laser" }]);
-    const events = run(s, 3, p1Fireball());
-    expect(of(events, "special")).toHaveLength(0);
-    expect(trySpecial(s, 0)).toBeNull();
+  /** P1 idle, with qcf + LP just entered (the last frame goes straight into the input history, not through a step). */
+  function qcfJustEntered(specials: unknown[], known: string[]): MatchState {
+    const s = newMatch(300, 660, { specials, known });
+    run(s, 2, script(P1_QCF[0], P1_QCF[1]));
+    s.fighters[0].history.push(P1_QCF[2] | B.LP, 1);
+    return s;
+  }
+
+  it("trySpecial starts a known special from this exact setup (so the tests below can fail)", () => {
+    const s = qcfJustEntered([{ type: "fireball", name: "BLAST" }], [...MOVE_TYPE_NAMES]);
+    expect(trySpecial(s, 0)).toMatchObject([{ type: "special", name: "BLAST" }]);
+  });
+
+  for (const type of ["laser", "constructor", "toString"]) {
+    it(`trySpecial ignores a special whose type isn't a move type ("${type}")`, () => {
+      const s = qcfJustEntered([{ type, name: "ZAP" }], [...MOVE_TYPE_NAMES, type]);
+      expect(s.fighters[0].fighter.specials).toMatchObject([{ type }]);
+      expect(s.fighters[0].attack).toBeNull();
+      expect(trySpecial(s, 0)).toBeNull();
+    });
+  }
+
+  describe("a move type with a typo", () => {
+    let warn: ReturnType<typeof vi.spyOn>;
+    const added: string[] = [];
+    function addType(type: string, over: Partial<MoveTypeDef>): void {
+      MOVE_TYPES[type] = { ...MOVE_TYPES.fireball, type, ...over };
+      added.push(type);
+    }
+    beforeEach(() => {
+      warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      for (const type of added.splice(0)) delete MOVE_TYPES[type];
+      warn.mockRestore();
+    });
+
+    it("an unknown motion turns the move off, with one message suggesting the closest motion", () => {
+      addType("typo-motion", { motion: "qcff" });
+      const s = newMatch(300, 660, { specials: [{ type: "typo-motion", name: "OOPS" }], known: ["typo-motion"] });
+      const events = run(s, 60, p1Fireball());
+      events.push(...run(s, 3, p1Fireball(), 0, 0));
+      expect(of(events, "special")).toHaveLength(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toMatch(/typo-motion.*"qcff".*Did you mean "qcf"/);
+    });
+
+    it("an unknown button acts as P, with one message", () => {
+      addType("typo-button", { button: "Punch" });
+      const s = newMatch(300, 660, { specials: [{ type: "typo-button", name: "STILL WORKS" }], known: ["typo-button"] });
+      const events = run(s, 60, p1Fireball());
+      expect(of(events, "special")).toMatchObject([{ name: "STILL WORKS" }]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toMatch(/typo-button.*button should be "P" or "K".*"Punch".*Using "P"/);
+    });
   });
 });
