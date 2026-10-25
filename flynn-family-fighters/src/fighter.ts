@@ -59,6 +59,18 @@ export const MAX_SPECIALS = 4;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
+/** A number from a character file, kept inside its range. Left out (undefined) if missing; a wrong type is ignored with a warning. */
+function tweak(
+  value: unknown, key: string, range: { min: number; max: number }, label: string, warn: (message: string) => void,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    warn(`🥊 ${label}: ${key} should be a number from ${range.min} to ${range.max}. Ignoring it.`);
+    return undefined;
+  }
+  return clampSettings({ [key]: value }, { [key]: range }, (m) => warn(`${label}: ${m}`))[key]!;
+}
+
 /**
  * Turns whatever a character file exports into a complete, safe Fighter.
  * Returns null (with a warning) if it isn't even an object.
@@ -100,13 +112,11 @@ export function normalizeFighter(
     }
     const choice: SpecialChoice = { type: s.type, name: typeof s.name === "string" && s.name.trim() ? s.name : s.type.toUpperCase() };
     if (typeof s.color === "string") choice.color = s.color;
-    const extra = clampSettings(
-      { speed: num(s.speed, 1), damageBonus: num(s.damageBonus, 0) },
-      SPECIAL_LIMITS,
-      (m) => warn(`${name} ${choice.name}: ${m}`),
-    );
-    if (s.speed !== undefined) choice.speed = extra.speed;
-    if (s.damageBonus !== undefined) choice.damageBonus = extra.damageBonus;
+    const label = `${name} ${choice.name}`;
+    const speed = tweak(s.speed, "speed", SPECIAL_LIMITS.speed, label, warn);
+    const damageBonus = tweak(s.damageBonus, "damageBonus", SPECIAL_LIMITS.damageBonus, label, warn);
+    if (speed !== undefined) choice.speed = speed;
+    if (damageBonus !== undefined) choice.damageBonus = damageBonus;
     specials.push(choice);
   }
   if (specials.length > MAX_SPECIALS) {
@@ -123,13 +133,10 @@ export function normalizeFighter(
       }
       if (!isObj(v)) continue;
       const entry: { damage?: number; reach?: number } = {};
-      const fixed = clampSettings(
-        { damage: num(v.damage, 1), reach: num(v.reach, 1) },
-        NORMAL_LIMITS,
-        (m) => warn(`${name} ${id}: ${m}`),
-      );
-      if (v.damage !== undefined) entry.damage = fixed.damage;
-      if (v.reach !== undefined) entry.reach = fixed.reach;
+      const damage = tweak(v.damage, "damage", NORMAL_LIMITS.damage, `${name} ${id}`, warn);
+      const reach = tweak(v.reach, "reach", NORMAL_LIMITS.reach, `${name} ${id}`, warn);
+      if (damage !== undefined) entry.damage = damage;
+      if (reach !== undefined) entry.reach = reach;
       normals[id as NormalId] = entry;
     }
   }

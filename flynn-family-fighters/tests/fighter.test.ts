@@ -44,6 +44,21 @@ describe("normalizeFighter", () => {
     expect(f.specials[0]).toMatchObject({ speed: 2, damageBonus: 0 });
   });
 
+  it("ignores wrong-typed numbers with a warning", () => {
+    const w1: string[] = [];
+    const f = normalizeFighter({ normals: { "st.HK": { damage: "20" } } }, "z", known, (m) => w1.push(m))!;
+    expect(f.normals["st.HK"]).toEqual({});
+    expect(w1).toHaveLength(1);
+
+    const w2: string[] = [];
+    const g = normalizeFighter(
+      { specials: [{ type: "fireball", name: "B", speed: "fast", damageBonus: "lots" }] }, "z", known, (m) => w2.push(m),
+    )!;
+    expect(g.specials[0]).not.toHaveProperty("speed");
+    expect(g.specials[0]).not.toHaveProperty("damageBonus");
+    expect(w2).toHaveLength(2);
+  });
+
   it("returns null with a warning for non-objects", () => {
     const warnings: string[] = [];
     expect(normalizeFighter(42, "x", known, (m) => warnings.push(m))).toBeNull();

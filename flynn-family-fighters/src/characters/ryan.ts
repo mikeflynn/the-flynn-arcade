@@ -39,5 +39,5 @@ export const fighter: Fighter = {
   ],
   normals: {},                // 🛠️ TRY THIS: "st.HP": { damage: 18 }
   winQuote: "Too slow, bro!",
-  stage: "ballpark",          // home stage in versus (optional)
+  stage: "ballfield",          // home stage in versus (optional)
 };
