@@ -30,8 +30,21 @@ const BUTTONS: readonly [number, string][] = [
   [B.HP, "HP"], [B.HK, "HK"], [B.MP, "MP"], [B.MK, "MK"], [B.LP, "LP"], [B.LK, "LK"],
 ];
 
+/** How long a fighter stays down, then takes to get up. They can't be hit during either. */
+const KNOCKDOWN_FRAMES = 40;
+const GETUP_FRAMES = 20;
+/** The dizzy meter: a fighter who reaches DIZZY_AT is dizzy for DIZZY_FRAMES; each newly pressed button shakes off DIZZY_MASH more. */
+const DIZZY_AT = 100;
+const DIZZY_FRAMES = 180;
+const DIZZY_MASH = 4;
+/** The meter holds for this many frames after a hit, then drains 1 per frame. */
+const STUN_DECAY_DELAY = 60;
+
 const ATTACK_FROM: FState[] = ["idle", "walkF", "walkB", "crouch", "guard", "jump"];
-const GUARD_FROM: FState[] = ["idle", "walkF", "walkB", "crouch", "guard"];
+/** Free on the ground: can guard, and can start a throw. */
+export const GUARD_FROM: FState[] = ["idle", "walkF", "walkB", "crouch", "guard"];
+/** Can't be hit at all. */
+const INVULNERABLE: FState[] = ["knockdown", "getup", "thrown", "ko", "win"];
 const BLOCK_FROM: FState[] = ["idle", "walkB", "crouch", "guard", "blockstun"];
 /** States that mean "back to normal": a combo is over once the defender reaches one. */
 const NEUTRAL: FState[] = ["idle", "walkF", "walkB", "crouch", "guard", "jumpSquat", "jump", "attack"];
@@ -139,10 +152,31 @@ function threatened(s: MatchState, i: 0 | 1): boolean {
   );
 }
 
-function setTimed(f: FighterState, state: FState, length: number): void {
+export function setTimed(f: FighterState, state: FState, length: number): void {
   f.state = state;
   f.stateFrame = 0;
   f.stateLength = frames(length, 1);
+}
+
+/** Knocks a fighter over: down for a while, then a getup, invulnerable the whole time. */
+export function knockDown(f: FighterState): void {
+  f.attack = null;
+  setTimed(f, "knockdown", KNOCKDOWN_FRAMES);
+}
+
+/**
+ * Adds to a fighter's dizzy meter after a hit. Reaching the top makes them dizzy
+ * (unless they're knocked down or out of health: a KO beats dizzy).
+ */
+export function addStun(s: MatchState, f: FighterState, index: 0 | 1, amount: number, events: MatchEvent[]): void {
+  if (!s.settings.dizzyEnabled || f.state === "dizzy") return;
+  f.stun += frames(amount);
+  f.stunDecayDelay = STUN_DECAY_DELAY;
+  if (f.stun < DIZZY_AT || f.health <= 0 || f.state === "knockdown") return;
+  f.attack = null;
+  f.stun = 0;
+  setTimed(f, "dizzy", DIZZY_FRAMES);
+  events.push({ type: "dizzy", player: index });
 }
 
 function toNeutral(f: FighterState): void {
@@ -164,22 +198,49 @@ export function tickHitstop(f: FighterState): boolean {
 }
 
 /**
- * Runs fighter i's timers for one step: hit/block stun, the current attack's
- * frames, and starting a new attack when a button is pressed.
+ * Runs fighter i's timers for one step: the dizzy meter, hit/block/knockdown/dizzy
+ * stun, and the current attack's frames. Returns true when the fighter is free to
+ * start something new (an attack or a throw) on this step.
  */
-export function updateAttack(s: MatchState, i: 0 | 1, events: MatchEvent[]): void {
+export function runTimers(s: MatchState, i: 0 | 1, events: MatchEvent[]): boolean {
   const f = s.fighters[i];
-  if (f.state === "hitstun" || f.state === "blockstun") {
-    f.stateFrame++;
-    if (f.stateFrame >= f.stateLength) toNeutral(f);
+  if (f.stunDecayDelay > 0) f.stunDecayDelay--;
+  else if (f.stun > 0) f.stun--;
+  switch (f.state) {
+    case "hitstun":
+    case "blockstun":
+    case "throwing":
+    case "getup":
+      f.stateFrame++;
+      if (f.stateFrame >= f.stateLength) toNeutral(f);
+      break;
+    case "knockdown":
+      f.stateFrame++;
+      if (f.stateFrame >= f.stateLength) setTimed(f, "getup", GETUP_FRAMES);
+      break;
+    case "dizzy": {
+      const shakes = BUTTONS.filter(([bit]) => f.history.pressed(bit)).length;
+      f.stateFrame += 1 + DIZZY_MASH * shakes;
+      if (f.stateFrame >= f.stateLength) toNeutral(f);
+      break;
+    }
+    default:
+      break;
   }
   if (f.attack) {
     f.attack.frame++;
     // A jump attack holds its pose until the fighter lands (one attack per jump).
     if (f.attack.frame >= totalFrames(f.attack.data) && !f.airborne) endAttack(f, i, events);
-    if (f.attack) return; // still busy; otherwise this first free frame can start the next attack
+    if (f.attack) return false; // still busy; otherwise this first free frame can start the next attack
   }
+  return true;
+}
+
+/** Starts the normal attack for a newly pressed button, if the fighter is free to. */
+export function startAttack(s: MatchState, i: 0 | 1): void {
+  const f = s.fighters[i];
   if (!ATTACK_FROM.includes(f.state)) return;
+  if (f.airborne && f.hitInAir) return; // hit in the air: no more attacking until you land
   const pressed = BUTTONS.find(([bit]) => f.history.pressed(bit));
   if (!pressed) return;
   const data = attackFor(f, pressed[0], s.fighters[1 - i]);
@@ -230,8 +291,9 @@ function pushBack(att: FighterState, def: FighterState, amount: number, stage: S
   att.x = clamp(att.x - (want - def.x), stage.left, stage.right);
 }
 
-function damageOf(att: FighterState, a: AttackData, damageScale: number): number {
-  return Math.max(0, Math.round(a.damage * (0.8 + 0.04 * att.fighter.stats.power) * damageScale));
+/** Damage after the attacker's power and the kid's damageScale setting. */
+export function damageOf(att: FighterState, baseDamage: number, damageScale: number): number {
+  return Math.max(0, Math.round(baseDamage * (0.8 + 0.04 * att.fighter.stats.power) * damageScale));
 }
 
 /**
@@ -246,7 +308,7 @@ export function resolveHits(s: MatchState): MatchEvent[] {
     const att = s.fighters[i];
     const def = s.fighters[1 - i];
     const atk = att.attack;
-    if (!atk || atk.hasHit || att.hitstop > 0 || !isActive(atk)) continue;
+    if (!atk || atk.hasHit || att.hitstop > 0 || !isActive(atk) || INVULNERABLE.includes(def.state)) continue;
     const hit = toWorld(atk.data.hitbox, att.x, att.y, att.facing);
     const body = toWorld(hurtbox(def), def.x, def.y, def.facing);
     if (!overlapOf(hit, body)) continue;
@@ -270,12 +332,17 @@ export function resolveHits(s: MatchState): MatchEvent[] {
       setTimed(def, "blockstun", a.blockstun);
       events.push({ type: "block", player: i, x, y, name: a.id });
     } else {
-      const damage = damageOf(att, a, s.settings.damageScale);
-      def.comboHits = def.state === "hitstun" ? def.comboHits + 1 : 1;
+      const damage = damageOf(att, a.damage, s.settings.damageScale);
+      const wasDizzy = def.state === "dizzy";
+      def.comboHits = def.state === "hitstun" || wasDizzy ? def.comboHits + 1 : 1;
       def.health = Math.max(0, def.health - damage);
       def.attack = null; // getting hit interrupts whatever they were doing
-      setTimed(def, "hitstun", a.hitstun);
+      def.hitInAir = def.airborne;
+      if (a.knockdown) knockDown(def);
+      else if (!wasDizzy) setTimed(def, "hitstun", a.hitstun); // a dizzy fighter stays dizzy
       events.push({ type: "hit", player: i, x, y, name: a.id, damage });
+      if (a.knockdown) events.push({ type: "knockdown", player: (1 - i) as 0 | 1, x, y });
+      addStun(s, def, (1 - i) as 0 | 1, a.dizzy, events);
     }
     const stop = frames(a.hitstop);
     att.hitstop = Math.max(att.hitstop, stop);

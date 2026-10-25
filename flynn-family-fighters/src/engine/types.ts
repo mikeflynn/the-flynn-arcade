@@ -12,6 +12,9 @@ export type FState =
   | "idle" | "walkF" | "walkB" | "crouch" | "guard" | "jumpSquat" | "jump" | "attack"
   | "hitstun" | "blockstun" | "knockdown" | "getup" | "dizzy" | "throwing" | "thrown" | "ko" | "win";
 
+/** States that run on a timer (stateFrame counts up to stateLength) rather than on input. */
+export const TIMED_STATES: readonly FState[] = ["hitstun", "blockstun", "knockdown", "getup", "dizzy", "throwing", "thrown"];
+
 export interface AttackData {
   id: string;
   startup: number;
@@ -77,6 +80,10 @@ export interface FighterState {
   airborne: boolean;
   /** Which way the current jump goes, relative to facing: 1 forward, -1 back, 0 straight up. */
   jumpDir: -1 | 0 | 1;
+  /** Hit while in the air: no more attacking until they land. */
+  hitInAir: boolean;
+  /** While `thrown` (with throw tech on): who grabbed this fighter and which way, until the throw lands. */
+  pendingThrow: { by: 0 | 1; back: boolean } | null;
 }
 
 /** The kid settings the engine reads. */
@@ -97,7 +104,10 @@ export interface MatchState {
   phase: "intro" | "fight" | "ko" | "roundOver" | "matchOver";
   phaseFrame: number;
   round: number;
+  /** Frames left on the round clock; it only runs during `fight`. */
   timerFrames: number;
+  /** Who won the round that just ended (null while fighting, or if it was a draw). */
+  roundWinner: 0 | 1 | null;
   fighters: [FighterState, FighterState];
   projectiles: Projectile[];
   rng: Rng;
@@ -105,11 +115,15 @@ export interface MatchState {
   stage: Stage;
 }
 
-/** For hit, block and whiff, `player` is the attacker (the defender is the other one). */
+/**
+ * For hit, block, whiff and throw, `player` is the attacker (the defender is the other one).
+ * For knockdown, dizzy, ko and throwTech it is the fighter it happened to / who broke the throw;
+ * for roundOver and matchOver it is the winner (missing for a draw).
+ */
 export type MatchEvent = {
   type:
     | "round" | "fight" | "hit" | "block" | "whiff" | "special" | "projectile" | "throw" | "knockdown"
-    | "dizzy" | "ko" | "timeOver" | "roundOver" | "matchOver" | "draw";
+    | "dizzy" | "ko" | "timeOver" | "roundOver" | "matchOver" | "draw" | "throwTech";
   player?: 0 | 1;
   x?: number;
   y?: number;

@@ -1,7 +1,7 @@
 // Walking, crouching, jumping, pushing and turning around.
 // Every number here is per frame (the game runs at 60 frames a second).
 
-import type { FighterState, Stage } from "./types";
+import { TIMED_STATES, type FighterState, type Stage } from "./types";
 
 const WALK_BASE = 1.5;
 const WALK_PER_SPEED = 0.25;
@@ -37,7 +37,8 @@ function setState(f: FighterState, state: FighterState["state"]): void {
 /** Moves one fighter for one frame, using the newest input already pushed into its history. */
 export function updateMovement(f: FighterState, stage: Stage): void {
   if (f.airborne) {
-    f.stateFrame++;
+    // Timed states (hitstun and friends) count their own frames in combat.ts; counting here too would run them at double speed.
+    if (!TIMED_STATES.includes(f.state)) f.stateFrame++;
     f.x = clamp(f.x + f.vx, stage.left, stage.right);
     f.y += f.vy;
     f.vy += GRAVITY;
@@ -47,8 +48,12 @@ export function updateMovement(f: FighterState, stage: Stage): void {
       f.vx = 0;
       f.airborne = false;
       f.jumpDir = 0;
-      f.state = "idle";
-      f.stateFrame = 0;
+      f.hitInAir = false;
+      // Landing from a jump or a jump attack means standing. Anything else (hitstun, a knockdown, a KO) carries on.
+      if (f.state === "jump" || f.state === "attack") {
+        f.state = "idle";
+        f.stateFrame = 0;
+      }
     }
     return;
   }
