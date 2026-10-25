@@ -3,7 +3,7 @@
 // The attack numbers themselves live in the kid file src/moves.ts.
 
 import type { NormalId } from "../fighter";
-import { NORMALS } from "../moves";
+import { NORMALS, type MoveData } from "../moves";
 import { B, type Dir } from "./input";
 import type { ActiveAttack, AttackData, Box, FState, FighterState, MatchEvent, MatchState, Stage } from "./types";
 
@@ -61,6 +61,23 @@ function isActive(atk: ActiveAttack): boolean {
   return atk.frame >= startupOf(atk.data) && atk.frame < activeEnd(atk.data);
 }
 
+const LEVELS: readonly AttackData["level"][] = ["high", "mid", "low"];
+
+/** Turns a moves.ts entry into engine data, fixing a level typo (to "mid" if it can't tell) with a friendly warning. */
+export function normalizeAttack(move: MoveData, warn: (message: string) => void = console.warn): AttackData {
+  const exact = LEVELS.find((l) => l === move.level);
+  if (exact) return { ...move, level: exact };
+  const close = LEVELS.find((l) => l === String(move.level).trim().toLowerCase());
+  const level = close ?? "mid";
+  warn(`🥊 moves.ts ${move.id}: level should be "high", "mid" or "low", not ${JSON.stringify(move.level)}. Using "${level}".`);
+  return { ...move, level };
+}
+
+/** The moves table, checked once when the game starts. */
+const ATTACKS = Object.fromEntries(
+  Object.entries(NORMALS).map(([id, move]) => [id, normalizeAttack(move)]),
+) as Record<NormalId, AttackData>;
+
 /** The fighter's current hurtbox, grown by the look's height. */
 export function hurtbox(f: FighterState): Box {
   const base = f.airborne ? HURTBOXES.air : f.crouching ? HURTBOXES.crouch : HURTBOXES.stand;
@@ -79,7 +96,7 @@ export function attackFor(f: FighterState, button: number, other: FighterState):
         ? "cl"
         : "st";
   const id = `${version}.${name}` as NormalId;
-  const base = NORMALS[id];
+  const base = ATTACKS[id];
   const tweak = f.fighter.normals[id] ?? {};
   const height = f.fighter.look.height;
   const reach = height * (tweak.reach ?? 1);

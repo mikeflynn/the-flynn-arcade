@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { normalizeFighter, type Fighter } from "../../src/fighter";
 import { B, type InputFrame } from "../../src/engine/input";
 import { createMatch, stepMatch } from "../../src/engine/match";
-import { attackFor, boxesOverlap, HURTBOXES, hurtbox } from "../../src/engine/combat";
+import { attackFor, boxesOverlap, HURTBOXES, hurtbox, normalizeAttack } from "../../src/engine/combat";
 import type { MatchEvent, MatchState } from "../../src/engine/types";
 import { NORMALS } from "../../src/moves";
 import { mySettings } from "../../src/settings";
@@ -60,6 +60,29 @@ describe("moves table", () => {
         expect(kick.x + kick.w).toBeCloseTo((punch.x + punch.w) * 1.2, 5);
       }
     }
+  });
+});
+
+describe("forgiving moves table", () => {
+  it("an unknown level becomes mid, with one friendly warning", () => {
+    const warn = vi.fn();
+    const a = normalizeAttack({ ...NORMALS["cr.LK"], level: "sideways" }, warn);
+    expect(a.level).toBe("mid");
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/cr\.LK/);
+    expect(warn.mock.calls[0][0]).toMatch(/"high", "mid" or "low"/);
+  });
+
+  it("a level in the wrong case is fixed, with a warning", () => {
+    const warn = vi.fn();
+    expect(normalizeAttack({ ...NORMALS["cr.LK"], level: " Low" }, warn).level).toBe("low");
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("good levels pass through quietly", () => {
+    const warn = vi.fn();
+    for (const m of Object.values(NORMALS)) expect(normalizeAttack(m, warn).level).toBe(m.level);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 
@@ -283,7 +306,7 @@ describe("guard (proximity guard)", () => {
 
   it("is raised by an opponent's projectile coming this way within 360 px", () => {
     const s = newMatch(200, 600);
-    const attack = NORMALS["st.LP"];
+    const attack = normalizeAttack(NORMALS["st.LP"]);
     s.projectiles.push({ owner: 0, x: 300, y: -120, vx: 4, color: "#fff", attack, age: 0 });
     run(s, 1, 0, P2_BACK);
     expect(s.fighters[1].state).toBe("guard");

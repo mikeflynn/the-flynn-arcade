@@ -35,6 +35,12 @@
 import type { NormalId } from "./fighter";
 import type { AttackData } from "./engine/types";
 
+/**
+ * One attack as written here. Like AttackData, but a typo in `level` won't stop
+ * the game from building: it becomes "mid" with a message in the console (F12).
+ */
+export type MoveData = Omit<AttackData, "level"> & { level: AttackData["level"] | (string & {}) };
+
 // The shared timing for each strength. Every attack copies one of these.
 // 🛠️ TRY THIS: make LIGHT's startup 2 and see how fast jabs come out.
 const LIGHT = {
@@ -57,7 +63,7 @@ const HEAVY = {
 
 // Every normal attack. Kicks reach 20% further than the matching punch.
 // 🛠️ TRY THIS: give "st.HK" knockdown: true for a big standing kick that knocks them over.
-export const NORMALS: Record<NormalId, AttackData> = {
+export const NORMALS: Record<NormalId, MoveData> = {
   // Standing punches: straight out at chest height.
   "st.LP": { ...LIGHT, id: "st.LP", hitbox: { x: 10, y: -210, w: 110, h: 70 }, cancellable: true },
   "st.MP": { ...MEDIUM, id: "st.MP", hitbox: { x: 10, y: -215, w: 130, h: 75 } },
