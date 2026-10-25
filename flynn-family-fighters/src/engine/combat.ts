@@ -145,6 +145,13 @@ export function worldHurtbox(f: FighterState): WorldBox {
   return toWorld(hurtbox(f), f.x, f.y, f.facing);
 }
 
+/** Fighter f's attack hitbox in world coordinates while it can hit (not for projectiles and grabs), or null. */
+export function worldHitbox(f: FighterState): WorldBox | null {
+  const atk = f.attack;
+  if (!atk || !isActive(atk) || atk.data.projectile || atk.data.grab) return null;
+  return toWorld(atk.data.hitbox, f.x, f.y, f.facing);
+}
+
 /** Do two boxes, each attached to a fighter at (x, y) facing a way, touch? */
 export function boxesOverlap(
   a: Box, aX: number, aY: number, aFacing: 1 | -1,

@@ -209,7 +209,7 @@ function spawnProjectile(s: MatchState, i: 0 | 1, a: AttackData, choice: Special
 }
 
 /** A projectile's box in the world: PROJECTILE_SIZE square around (x, y). */
-function projectileBox(p: Projectile): WorldBox {
+export function projectileBox(p: Projectile): WorldBox {
   const half = PROJECTILE_SIZE / 2;
   return { x0: p.x - half, x1: p.x + half, y0: p.y - half, y1: p.y + half };
 }
