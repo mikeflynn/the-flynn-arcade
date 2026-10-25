@@ -9,3 +9,6 @@ export * from "./pose";
 export { bodyParts } from "./parts/body";
 export { handParts } from "./parts/hands";
 export { weaponShape } from "./parts/weapons";
+export { headPart } from "./parts/head";
+export { HAIR_FRONT } from "./parts/hair";
+export { buildParts, type ShapeName } from "./parts/index";

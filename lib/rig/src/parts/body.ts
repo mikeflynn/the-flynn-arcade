@@ -39,6 +39,9 @@ export function bodyParts(look: Look, d: BodyDims): Record<BodyPartName, PartSha
     blob(e(0, d.faL * 0.3, 36 * w, d.faL * 0.64), skin, { shade: -5 * w, hi: 8 * w }),
     poly([[-15 * w, d.faL * 0.3], [15 * w, d.faL * 0.3], [11 * w, d.faL - 4], [-11 * w, d.faL - 4]], skin, { shade: -4 * w, hi: 6 * w }),
     poly([[-12 * w, d.faL - 20], [12 * w, d.faL - 20], [12 * w, d.faL], [-12 * w, d.faL]], wrap, { shade: -4 * w }),
+    ...(look.extras.includes("wristbands")
+      ? [poly([[-13 * w, d.faL - 34], [13 * w, d.faL - 34], [13 * w, d.faL - 22], [-13 * w, d.faL - 22]], hex(look.accent, 0xe8e8e8), { shade: -4 * w, hi: 6 * w })]
+      : []),
   ], [{ p: [[-4 * w, 10], [4 * w, d.faL * 0.5]], w: 2, c: darken(skin, 0.5) }]);
 
   const thigh = () => {
