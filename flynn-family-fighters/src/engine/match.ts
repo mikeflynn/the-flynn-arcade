@@ -3,6 +3,7 @@
 // slot in as extra steps without changing the shape.
 
 import type { Fighter } from "../fighter";
+import { afterMovement, resolveHits, tickHitstop, updateAttack, updateGuard } from "./combat";
 import type { InputFrame } from "./input";
 import { InputHistory } from "./input";
 import { pushApart, updateFacing, updateMovement } from "./movement";
@@ -25,6 +26,7 @@ function createFighterState(fighter: Fighter, x: number, facing: 1 | -1): Fighte
     maxHealth: fighter.stats.health,
     state: "idle",
     stateFrame: 0,
+    stateLength: 0,
     attack: null,
     hitstop: 0,
     stun: 0,
@@ -66,15 +68,25 @@ function stepIntro(s: MatchState, events: MatchEvent[]): void {
   }
 }
 
-function stepFight(s: MatchState, inputs: [InputFrame, InputFrame]): void {
+const PLAYERS = [0, 1] as const;
+
+function stepFight(s: MatchState, inputs: [InputFrame, InputFrame], events: MatchEvent[]): void {
   const [p1, p2] = s.fighters;
   p1.history.push(inputs[0], p1.facing);
   p2.history.push(inputs[1], p2.facing);
-  updateMovement(p1, s.stage);
-  updateMovement(p2, s.stage);
+  // Hitstop: a fighter frozen this step skips everything below (inputs are still recorded).
+  const frozen = [tickHitstop(p1), tickHitstop(p2)];
+  for (const i of PLAYERS) if (!frozen[i]) updateAttack(s, i, events);
+  const guarding = PLAYERS.map((i) => !frozen[i] && updateGuard(s, i));
+  for (const i of PLAYERS) {
+    if (frozen[i]) continue;
+    if (!guarding[i]) updateMovement(s.fighters[i], s.stage);
+    afterMovement(s, i, events);
+  }
   pushApart(p1, p2, s.stage);
   updateFacing(p1, p2);
   updateFacing(p2, p1);
+  events.push(...resolveHits(s));
   s.phaseFrame++;
 }
 
@@ -86,7 +98,7 @@ export function stepMatch(s: MatchState, inputs: [InputFrame, InputFrame]): Matc
       stepIntro(s, events);
       break;
     case "fight":
-      stepFight(s, inputs);
+      stepFight(s, inputs, events);
       break;
     default:
       break; // ko / roundOver / matchOver arrive with the round logic

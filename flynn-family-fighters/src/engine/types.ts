@@ -63,6 +63,8 @@ export interface FighterState {
   maxHealth: number;
   state: FState;
   stateFrame: number;
+  /** How many frames a timed state (hitstun, blockstun) lasts; it ends when stateFrame reaches this. */
+  stateLength: number;
   attack: ActiveAttack | null;
   hitstop: number;
   stun: number;
@@ -103,6 +105,7 @@ export interface MatchState {
   stage: Stage;
 }
 
+/** For hit, block and whiff, `player` is the attacker (the defender is the other one). */
 export type MatchEvent = {
   type:
     | "round" | "fight" | "hit" | "block" | "whiff" | "special" | "projectile" | "throw" | "knockdown"
