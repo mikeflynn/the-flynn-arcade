@@ -15,11 +15,11 @@ export function animLength(a: Animation): number {
   return a.keys.reduce((sum, k) => sum + k.frames, 0);
 }
 
-/** Looping animations wrap; non-looping ones hold their last frame. */
+/** Looping animations wrap; non-looping ones hold the final pose (frame `len`). */
 function localFrame(a: Animation, frame: number): number {
   const len = animLength(a);
   if (len <= 0) return 0;
-  return a.loop ? ((frame % len) + len) % len : Math.min(Math.max(frame, 0), len - 1);
+  return a.loop ? ((frame % len) + len) % len : Math.min(Math.max(frame, 0), len);
 }
 
 /**
@@ -54,16 +54,17 @@ export function flatFeet(p: Pose): Pose {
   return out;
 }
 
-/** Frames that get baked: every (60 / fps)th frame plus each key's first frame. */
+/** Frames that get baked: every (60 / fps)th frame, each key's first frame, and (non-looping only) the final pose at frame `len`. */
 export function heldFrames(a: Animation, fps: 15 | 20 | 30): number[] {
   const step = 60 / fps, len = animLength(a), set = new Set<number>();
   for (let f = 0; f < len; f += step) set.add(f);
   let start = 0;
   for (const k of a.keys) { if (k.frames > 0) set.add(start); start += k.frames; }
+  if (!a.loop && len > 0) set.add(len); // the true final pose, so a held animation never shows a mid-transition sprite
   return [...set].sort((x, y) => x - y);
 }
 
-/** The latest held frame at or before `frame` (after looping/holding like samplePose). */
+/** The latest held frame at or before `frame` (looping wraps; non-looping clamps to `len`, the baked final pose, matching samplePose). */
 export function shownFrame(a: Animation, held: number[], frame: number): number {
   const f = localFrame(a, frame);
   let shown = held[0] ?? 0;

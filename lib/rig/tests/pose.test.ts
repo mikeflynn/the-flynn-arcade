@@ -61,14 +61,24 @@ describe("heldFrames / shownFrame", () => {
     keys: [4, 2, 6].map((frames) => ({ pose: {}, frames, ease: "linear" as const })),
   };
   it("bakes every 60/fps frame plus each key start", () => {
-    expect(heldFrames(a, 20)).toEqual([0, 3, 4, 6, 9]);
-    expect(heldFrames(a, 15)).toEqual([0, 4, 6, 8]);
+    expect(heldFrames(a, 20)).toEqual([0, 3, 4, 6, 9, 12]);
+    expect(heldFrames(a, 15)).toEqual([0, 4, 6, 8, 12]);
   });
   it("shows the latest held frame at or before the frame", () => {
     const held = heldFrames(a, 20);
     expect(shownFrame(a, held, 5)).toBe(4);
     expect(shownFrame(a, held, 11)).toBe(9);
-    expect(shownFrame(a, held, 40)).toBe(9);
+    expect(shownFrame(a, held, 12)).toBe(12);
+    expect(shownFrame(a, held, 40)).toBe(12);
+  });
+  it("shows the baked final pose once a non-looping animation ends", () => {
+    const b: Animation = { loop: false, keys: [{ pose: { a: 0 }, frames: 4, ease: "sine" }, { pose: { a: 10 }, frames: 8, ease: "out" }] };
+    const held = heldFrames(b, 20), from = { a: 3 };
+    for (const f of [12, 17, 100]) expect(samplePose(b, shownFrame(b, held, f), from)).toEqual(samplePose(b, f, from));
+  });
+  it("does not bake len for looping animations", () => {
+    const l: Animation = { ...a, loop: true };
+    expect(heldFrames(l, 20)).toEqual([0, 3, 4, 6, 9]);
   });
   it("wraps looping animations", () => {
     const l: Animation = { ...a, loop: true };
