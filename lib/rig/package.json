@@ -1,0 +1,23 @@
+{
+  "name": "@web-games/rig",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./canvas": "./src/canvas/index.ts",
+    "./phaser": "./src/phaser/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "phaser": "3.90.0"
+  },
+  "devDependencies": {
+    "phaser": "3.90.0",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}
