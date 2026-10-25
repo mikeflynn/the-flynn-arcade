@@ -49,8 +49,9 @@ export function updateMovement(f: FighterState, stage: Stage): void {
       f.airborne = false;
       f.jumpDir = 0;
       f.hitInAir = false;
-      // Landing from a jump or a jump attack means standing. Anything else (hitstun, a knockdown, a KO) carries on.
-      if (f.state === "jump" || f.state === "attack") {
+      // Landing from a jump or a jump attack means standing. Anything else (hitstun, a knockdown, a KO,
+      // a rising special that still has its landing recovery to do) carries on.
+      if (f.state === "jump" || (f.state === "attack" && !f.attack?.inAir)) {
         f.state = "idle";
         f.stateFrame = 0;
       }

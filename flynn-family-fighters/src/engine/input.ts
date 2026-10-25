@@ -99,6 +99,15 @@ export class InputHistory {
     }
     return presses;
   }
+
+  /** The buttons (of these bits) that went down on the newest frame with a press in the last `window` frames, or 0. */
+  newestPress(bits: number, window: number): number {
+    for (let i = 0; i < window && i < this.count; i++) {
+      const down = this.frameAgo(i) & bits & ~this.frameAgo(i + 1);
+      if (down !== 0) return down;
+    }
+    return 0;
+  }
 }
 
 export type Motion = "qcf" | "qcb" | "dp" | "chargeBF" | "chargeDU" | "mash" | "360";

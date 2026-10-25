@@ -4,6 +4,7 @@ import { bakeFighter, type BakedFighter } from "@web-games/rig/canvas";
 import { FighterSprite } from "@web-games/rig/phaser";
 import { animations } from "../animations";
 import type { Fighter } from "../fighter";
+import { KNOWN_MOVE_TYPES } from "../moves";
 import { loadRoster } from "../roster";
 import { FPS_CHOICES, settings, type Fps } from "../settings";
 
@@ -49,7 +50,7 @@ export class ViewerScene extends Phaser.Scene {
   }
 
   private async build(): Promise<void> {
-    const { fighters, problems } = await loadRoster();
+    const { fighters, problems } = await loadRoster(KNOWN_MOVE_TYPES);
     problems.forEach((p) => console.warn(`🥊 ${p}`));
     fighters.forEach((fighter, i) => {
       const baked = bakeFighter(fighter.look, animations, { fps: this.fps });

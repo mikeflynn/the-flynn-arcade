@@ -8,6 +8,7 @@ import type { InputFrame } from "./input";
 import { InputHistory } from "./input";
 import { pushApart, updateFacing, updateMovement } from "./movement";
 import { Rng } from "./rng";
+import { runSpecial, trySpecial, updateProjectiles } from "./specials";
 import { tryThrow, updateThrown } from "./throws";
 import type { FightSettings, FighterState, MatchEvent, MatchState } from "./types";
 
@@ -88,14 +89,18 @@ function stepFight(s: MatchState, inputs: [InputFrame, InputFrame], events: Matc
   events.push(...updateThrown(s));
   // Hitstop: a fighter frozen this step skips everything below (inputs are still recorded).
   const frozen = [tickHitstop(p1), tickHitstop(p2)];
+  // Cancels: a cancellable normal that connected can turn into a special during its hitstop.
+  for (const i of PLAYERS) if (frozen[i]) events.push(...(trySpecial(s, i) ?? []));
   // Everyone's timers run before anyone starts something new, so neither player gets a head start.
   const free = PLAYERS.map((i) => !frozen[i] && runTimers(s, i, events));
   for (const i of PLAYERS) {
     if (!free[i]) continue;
-    const thrown = tryThrow(s, i); // a throw wins over a normal attack when both fit the button press
-    if (thrown) events.push(...thrown);
+    // A special wins over a throw, and a throw over a normal attack, when more than one fits the input.
+    const started = trySpecial(s, i) ?? tryThrow(s, i);
+    if (started) events.push(...started);
     else startAttack(s, i);
   }
+  for (const i of PLAYERS) if (!frozen[i]) runSpecial(s, i, events);
   const guarding = PLAYERS.map((i) => !frozen[i] && updateGuard(s, i));
   for (const i of PLAYERS) {
     if (frozen[i]) continue;
@@ -106,6 +111,7 @@ function stepFight(s: MatchState, inputs: [InputFrame, InputFrame], events: Matc
   updateFacing(p1, p2);
   updateFacing(p2, p1);
   events.push(...resolveHits(s));
+  events.push(...updateProjectiles(s));
   s.phaseFrame++;
   s.timerFrames = Math.max(0, s.timerFrames - 1);
   checkRoundEnd(s, events);

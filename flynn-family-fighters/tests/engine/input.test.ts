@@ -96,6 +96,17 @@ describe("InputHistory", () => {
     h.push(B.LP, 1);
     expect(h.pressed(B.LP)).toBe(false);
   });
+  it("newestPress finds the latest press within a few frames", () => {
+    const h = new InputHistory();
+    h.push(B.LP, 1);
+    h.push(B.LP | B.HP, 1);
+    h.push(0, 1);
+    expect(h.newestPress(B.LP | B.MP | B.HP, 3)).toBe(B.HP);
+    expect(h.newestPress(B.LK, 3)).toBe(0);
+    h.push(0, 1);
+    h.push(0, 1);
+    expect(h.newestPress(B.HP, 3)).toBe(0);
+  });
   it("dirAgo and heldFor count back from now", () => {
     const h = feed([2, 4, 4, 4]);
     expect(h.dirAgo(0)).toBe(4);

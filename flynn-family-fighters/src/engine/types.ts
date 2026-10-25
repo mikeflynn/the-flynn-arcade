@@ -31,9 +31,16 @@ export interface AttackData {
   pushback: number;
   knockdown: boolean;
   cancellable: boolean;
+  /** Throws a projectile on the first active frame instead of hitting with the body. */
   projectile?: { speed: number; color?: string };
+  /** Can't be hit while the attack's frame is below this. */
   invulnFrames?: number;
+  /** During the active frames the fighter moves forward at vx; a vy lifts them off the ground on the first one. */
   move?: { vx?: number; vy?: number };
+  /** Multi-hit: the attack can hit again every this many frames while active. */
+  rehitEvery?: number;
+  /** A grab instead of a hit: works when the gap between the bodies is at most `range`. */
+  grab?: { range: number };
 }
 
 export interface ActiveAttack {
@@ -41,6 +48,8 @@ export interface ActiveAttack {
   frame: number;
   hasHit: boolean;
   special?: SpecialChoice;
+  /** The special lifted the fighter off the ground: landing starts its recovery. */
+  inAir?: boolean;
 }
 
 export interface Projectile {
@@ -83,7 +92,7 @@ export interface FighterState {
   /** Hit while in the air: no more attacking until they land. */
   hitInAir: boolean;
   /** While `thrown` (with throw tech on): who grabbed this fighter and which way, until the throw lands. */
-  pendingThrow: { by: 0 | 1; back: boolean } | null;
+  pendingThrow: { by: 0 | 1; back: boolean; damage: number; dizzy: number } | null;
 }
 
 /** The kid settings the engine reads. */

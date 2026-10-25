@@ -45,6 +45,7 @@ const ATTACK_FROM: FState[] = ["idle", "walkF", "walkB", "crouch", "guard", "jum
 export const GUARD_FROM: FState[] = ["idle", "walkF", "walkB", "crouch", "guard"];
 /** Can't be hit at all. */
 const INVULNERABLE: FState[] = ["knockdown", "getup", "thrown", "ko", "win"];
+
 const BLOCK_FROM: FState[] = ["idle", "walkB", "crouch", "guard", "blockstun"];
 /** States that mean "back to normal": a combo is over once the defender reaches one. */
 const NEUTRAL: FState[] = ["idle", "walkF", "walkB", "crouch", "guard", "jumpSquat", "jump", "attack"];
@@ -53,16 +54,16 @@ const DOWNS: Dir[] = [1, 2, 3];
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** A frame count from moves.ts, made safe: a whole number, never below `min`. */
-function frames(n: number, min = 0): number {
+export function frames(n: number, min = 0): number {
   return Number.isFinite(n) ? Math.max(min, Math.round(n)) : min;
 }
 
-function startupOf(a: AttackData): number {
+export function startupOf(a: AttackData): number {
   return frames(a.startup);
 }
 
 /** The first frame after the active frames. */
-function activeEnd(a: AttackData): number {
+export function activeEnd(a: AttackData): number {
   return startupOf(a) + frames(a.active, 1);
 }
 
@@ -72,6 +73,12 @@ function totalFrames(a: AttackData): number {
 
 function isActive(atk: ActiveAttack): boolean {
   return atk.frame >= startupOf(atk.data) && atk.frame < activeEnd(atk.data);
+}
+
+/** Can anything (an attack or a projectile) hit this fighter right now? Not while down, and not during an attack's invulnerable frames. */
+export function canBeHit(f: FighterState): boolean {
+  if (INVULNERABLE.includes(f.state)) return false;
+  return !(f.attack && f.attack.frame < frames(f.attack.data.invulnFrames ?? 0));
 }
 
 const LEVELS: readonly AttackData["level"][] = ["high", "mid", "low"];
@@ -111,17 +118,17 @@ export function attackFor(f: FighterState, button: number, other: FighterState):
   const id = `${version}.${name}` as NormalId;
   const base = ATTACKS[id];
   const tweak = f.fighter.normals[id] ?? {};
-  const height = f.fighter.look.height;
-  const reach = height * (tweak.reach ?? 1);
-  const hb = base.hitbox;
-  return {
-    ...base,
-    damage: tweak.damage ?? base.damage,
-    hitbox: { x: hb.x * reach, y: hb.y * height, w: hb.w * reach, h: hb.h * height },
-  };
+  return { ...base, damage: tweak.damage ?? base.damage, hitbox: sizedHitbox(base.hitbox, f, tweak.reach ?? 1) };
 }
 
-type WorldBox = { x0: number; x1: number; y0: number; y1: number };
+/** A hitbox from moves.ts, grown with the look's height (and stretched sideways by `reach`). */
+export function sizedHitbox(hb: Box, f: FighterState, reach = 1): Box {
+  const height = f.fighter.look.height;
+  const r = height * reach;
+  return { x: hb.x * r, y: hb.y * height, w: hb.w * r, h: hb.h * height };
+}
+
+export type WorldBox = { x0: number; x1: number; y0: number; y1: number };
 
 /** A box relative to a fighter's feet, turned into world coordinates. */
 function toWorld(b: Box, x: number, y: number, facing: 1 | -1): WorldBox {
@@ -129,8 +136,13 @@ function toWorld(b: Box, x: number, y: number, facing: 1 | -1): WorldBox {
   return { x0, x1: x0 + b.w, y0: y + b.y, y1: y + b.y + b.h };
 }
 
-function overlapOf(a: WorldBox, b: WorldBox): boolean {
+export function overlapOf(a: WorldBox, b: WorldBox): boolean {
   return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+}
+
+/** Fighter f's hurtbox in world coordinates. */
+export function worldHurtbox(f: FighterState): WorldBox {
+  return toWorld(hurtbox(f), f.x, f.y, f.facing);
 }
 
 /** Do two boxes, each attached to a fighter at (x, y) facing a way, touch? */
@@ -215,7 +227,7 @@ export function runTimers(s: MatchState, i: 0 | 1, events: MatchEvent[]): boolea
       if (f.stateFrame >= f.stateLength) toNeutral(f);
       break;
     case "knockdown":
-      f.stateFrame++;
+      if (!f.airborne) f.stateFrame++; // knocked down in the air: the time on the floor starts at landing
       if (f.stateFrame >= f.stateLength) setTimed(f, "getup", GETUP_FRAMES);
       break;
     case "dizzy": {
@@ -269,15 +281,22 @@ export function updateGuard(s: MatchState, i: 0 | 1): boolean {
   return true;
 }
 
-/** Tidies up after movement: a jump attack ends on landing, and a combo ends back in neutral. */
+/**
+ * Tidies up after movement: a jump attack ends on landing, a special that lifted
+ * the fighter starts its recovery on landing, and a combo ends back in neutral.
+ */
 export function afterMovement(s: MatchState, i: 0 | 1, events: MatchEvent[]): void {
   const f = s.fighters[i];
+  if (f.attack?.inAir && !f.airborne) {
+    f.attack.inAir = false;
+    f.attack.frame = activeEnd(f.attack.data);
+  }
   if (f.attack && f.state !== "attack") endAttack(f, i, events); // landing set the state to idle
   if (NEUTRAL.includes(f.state)) f.comboHits = 0;
 }
 
 /** Standing blocks high and mid, crouching blocks low and mid. You must hold back, be on the ground, and be free. */
-function canBlock(def: FighterState, level: AttackData["level"]): boolean {
+export function canBlock(def: FighterState, level: AttackData["level"]): boolean {
   const dir = def.history.dirAgo(0);
   if ((dir !== 4 && dir !== 1) || def.airborne || !BLOCK_FROM.includes(def.state)) return false;
   return dir === 1 ? level !== "high" : level !== "low";
@@ -297,9 +316,41 @@ export function damageOf(att: FighterState, baseDamage: number, damageScale: num
 }
 
 /**
+ * Applies a hit or a block from fighter i's attack `a` to the other fighter.
+ * Hitstop and pushback are up to the caller. Blocked special moves chip.
+ */
+export function applyContact(
+  s: MatchState, i: 0 | 1, a: AttackData, special: boolean, blocked: boolean, x: number, y: number,
+): MatchEvent[] {
+  const att = s.fighters[i];
+  const def = s.fighters[1 - i];
+  const damage = damageOf(att, a.damage, s.settings.damageScale);
+  if (blocked) {
+    const chip = special ? Math.round(damage * s.settings.chipDamageFraction) : frames(a.chip);
+    def.crouching = def.history.dirAgo(0) === 1;
+    def.health = Math.max(0, def.health - chip);
+    setTimed(def, "blockstun", a.blockstun);
+    return [{ type: "block", player: i, x, y, name: a.id }];
+  }
+  const events: MatchEvent[] = [];
+  const wasDizzy = def.state === "dizzy";
+  def.comboHits = def.state === "hitstun" || wasDizzy ? def.comboHits + 1 : 1;
+  def.health = Math.max(0, def.health - damage);
+  def.attack = null; // getting hit interrupts whatever they were doing
+  def.hitInAir = def.airborne;
+  if (a.knockdown) knockDown(def);
+  else if (!wasDizzy) setTimed(def, "hitstun", a.hitstun); // a dizzy fighter stays dizzy
+  events.push({ type: "hit", player: i, x, y, name: a.id, damage });
+  if (a.knockdown) events.push({ type: "knockdown", player: (1 - i) as 0 | 1, x, y });
+  addStun(s, def, (1 - i) as 0 | 1, a.dizzy, events);
+  return events;
+}
+
+/**
  * Checks both fighters' active attacks against the other's hurtbox and applies
  * every hit or block. Both sides are checked before either is applied, so two
- * attacks that connect on the same step trade.
+ * attacks that connect on the same step trade. Fireballs and grabs don't hit
+ * with the body (specials.ts handles them).
  */
 export function resolveHits(s: MatchState): MatchEvent[] {
   const events: MatchEvent[] = [];
@@ -308,9 +359,10 @@ export function resolveHits(s: MatchState): MatchEvent[] {
     const att = s.fighters[i];
     const def = s.fighters[1 - i];
     const atk = att.attack;
-    if (!atk || atk.hasHit || att.hitstop > 0 || !isActive(atk) || INVULNERABLE.includes(def.state)) continue;
+    if (!atk || atk.hasHit || att.hitstop > 0 || !isActive(atk) || !canBeHit(def)) continue;
+    if (atk.data.projectile || atk.data.grab) continue;
     const hit = toWorld(atk.data.hitbox, att.x, att.y, att.facing);
-    const body = toWorld(hurtbox(def), def.x, def.y, def.facing);
+    const body = worldHurtbox(def);
     if (!overlapOf(hit, body)) continue;
     contacts.push({
       i,
@@ -326,24 +378,7 @@ export function resolveHits(s: MatchState): MatchEvent[] {
     const def = s.fighters[1 - i];
     const a = atk.data;
     atk.hasHit = true;
-    if (blocked) {
-      def.crouching = def.history.dirAgo(0) === 1;
-      def.health = Math.max(0, def.health - frames(a.chip));
-      setTimed(def, "blockstun", a.blockstun);
-      events.push({ type: "block", player: i, x, y, name: a.id });
-    } else {
-      const damage = damageOf(att, a.damage, s.settings.damageScale);
-      const wasDizzy = def.state === "dizzy";
-      def.comboHits = def.state === "hitstun" || wasDizzy ? def.comboHits + 1 : 1;
-      def.health = Math.max(0, def.health - damage);
-      def.attack = null; // getting hit interrupts whatever they were doing
-      def.hitInAir = def.airborne;
-      if (a.knockdown) knockDown(def);
-      else if (!wasDizzy) setTimed(def, "hitstun", a.hitstun); // a dizzy fighter stays dizzy
-      events.push({ type: "hit", player: i, x, y, name: a.id, damage });
-      if (a.knockdown) events.push({ type: "knockdown", player: (1 - i) as 0 | 1, x, y });
-      addStun(s, def, (1 - i) as 0 | 1, a.dizzy, events);
-    }
+    events.push(...applyContact(s, i, a, atk.special !== undefined, blocked, x, y));
     const stop = frames(a.hitstop);
     att.hitstop = Math.max(att.hitstop, stop);
     def.hitstop = Math.max(def.hitstop, stop);

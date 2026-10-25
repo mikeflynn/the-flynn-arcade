@@ -35,13 +35,15 @@ function throwInput(f: FighterState): "forward" | "back" | null {
   return dir === 6 ? "forward" : dir === 4 ? "back" : null;
 }
 
+type Grab = { back: boolean; damage: number; dizzy: number };
+
 /** The throw lands: damage, a knockdown, and (for a back throw) the thrown fighter ends up behind the thrower. */
-function landThrow(s: MatchState, attacker: 0 | 1, back: boolean): MatchEvent[] {
+function landThrow(s: MatchState, attacker: 0 | 1, { back, damage, dizzy }: Grab): MatchEvent[] {
   const att = s.fighters[attacker];
   const def = s.fighters[1 - attacker];
   const defender = (1 - attacker) as 0 | 1;
   const events: MatchEvent[] = [];
-  def.health = Math.max(0, def.health - damageOf(att, THROW_DAMAGE, s.settings.damageScale));
+  def.health = Math.max(0, def.health - damageOf(att, damage, s.settings.damageScale));
   def.comboHits = 1;
   if (back) {
     const gap = Math.abs(def.x - att.x);
@@ -51,7 +53,35 @@ function landThrow(s: MatchState, attacker: 0 | 1, back: boolean): MatchEvent[] 
   def.pendingThrow = null;
   knockDown(def);
   events.push({ type: "knockdown", player: defender, x: def.x, y: def.y });
-  addStun(s, def, defender, THROW_DIZZY, events);
+  addStun(s, def, defender, dizzy, events);
+  return events;
+}
+
+/** Could `attacker` grab the other fighter right now, if the bodies are at most `gap` apart? */
+export function canGrab(s: MatchState, attacker: 0 | 1, gap: number): boolean {
+  const att = s.fighters[attacker];
+  const def = s.fighters[1 - attacker];
+  if (def.airborne || NOT_THROWABLE.includes(def.state)) return false;
+  return Math.abs(def.x - att.x) - pushWidth(att, def) <= gap;
+}
+
+/** Starts a grab (a normal throw or a command throw). Returns the events. */
+export function grab(s: MatchState, attacker: 0 | 1, how: Grab): MatchEvent[] {
+  const att = s.fighters[attacker];
+  const def = s.fighters[1 - attacker];
+  const damage = damageOf(att, how.damage, s.settings.damageScale);
+  const events: MatchEvent[] = [{ type: "throw", player: attacker, x: (att.x + def.x) / 2, y: -120, damage }];
+  att.attack = null;
+  att.crouching = false;
+  setTimed(att, "throwing", THROW_FRAMES);
+  def.attack = null;
+  def.crouching = false;
+  if (s.settings.throwTechEnabled) {
+    setTimed(def, "thrown", TECH_FRAMES);
+    def.pendingThrow = { by: attacker, ...how };
+  } else {
+    events.push(...landThrow(s, attacker, how));
+  }
   return events;
 }
 
@@ -61,27 +91,10 @@ function landThrow(s: MatchState, attacker: 0 | 1, back: boolean): MatchEvent[] 
  */
 export function tryThrow(s: MatchState, attacker: 0 | 1): MatchEvent[] | null {
   const att = s.fighters[attacker];
-  const def = s.fighters[1 - attacker];
   if (att.airborne || !GUARD_FROM.includes(att.state)) return null;
-  if (def.airborne || NOT_THROWABLE.includes(def.state)) return null;
   const input = throwInput(att);
-  if (!input || Math.abs(def.x - att.x) - pushWidth(att, def) > THROW_GAP) return null;
-
-  const back = input === "back";
-  const damage = damageOf(att, THROW_DAMAGE, s.settings.damageScale);
-  const events: MatchEvent[] = [{ type: "throw", player: attacker, x: (att.x + def.x) / 2, y: -120, damage }];
-  att.attack = null;
-  att.crouching = false;
-  setTimed(att, "throwing", THROW_FRAMES);
-  def.attack = null;
-  def.crouching = false;
-  if (s.settings.throwTechEnabled) {
-    setTimed(def, "thrown", TECH_FRAMES);
-    def.pendingThrow = { by: attacker, back };
-  } else {
-    events.push(...landThrow(s, attacker, back));
-  }
-  return events;
+  if (!input || !canGrab(s, attacker, THROW_GAP)) return null;
+  return grab(s, attacker, { back: input === "back", damage: THROW_DAMAGE, dizzy: THROW_DIZZY });
 }
 
 /**
@@ -93,7 +106,7 @@ export function updateThrown(s: MatchState): MatchEvent[] {
   for (const i of [0, 1] as const) {
     const f = s.fighters[i];
     if (f.state !== "thrown" || !f.pendingThrow) continue;
-    const { by, back } = f.pendingThrow;
+    const { by, ...how } = f.pendingThrow;
     const att = s.fighters[by];
     f.stateFrame++;
     if (throwInput(f)) {
@@ -107,7 +120,7 @@ export function updateThrown(s: MatchState): MatchEvent[] {
       f.pendingThrow = null;
       events.push({ type: "throwTech", player: i, x: (f.x + att.x) / 2, y: -120 });
     } else if (f.stateFrame >= f.stateLength) {
-      events.push(...landThrow(s, by, back));
+      events.push(...landThrow(s, by, how));
     }
   }
   return events;
