@@ -133,6 +133,18 @@ const STANDING = STANCE;
 const CROUCHING = pose(CROUCH);
 const FLOATING = pose(AIR);
 
+// Kicks keep only the back foot down, so the back leg holds the body up. In
+// these "ready" poses the back leg is the longer one, so the standing foot
+// stays on the floor and the kicking foot starts just above it.
+/** The back leg kicks stand on: nearly straight. */
+const KICK_LEG: Pose = { bTh: 24, bSh: 4 };
+/** Standing, ready to kick. Standing kicks start and end here. */
+const KICK_READY = pose({ ...KICK_LEG, fTh: -36, fSh: 52, plant: "b" });
+/** The back leg crouching kicks stand on: a little less bent than the crouch. */
+const CROUCH_KICK_LEG: Pose = { bTh: -18, bSh: 100 };
+/** Crouching, ready to kick. Crouching kicks start and end here. */
+const CROUCH_KICK_READY = pose({ ...CROUCH, ...CROUCH_KICK_LEG, fTh: -88, fSh: 100, plant: "b" });
+
 /** A standing pose, a crouching pose and an air pose, each built on its base. */
 const st = (p: Pose) => pose(p);
 const cr = (p: Pose) => pose({ ...CROUCH, ...p });
@@ -156,15 +168,15 @@ const NORMAL_ANIMS: Record<keyof typeof NORMALS, Animation> = {
 
   // Standing kicks: only the back foot stays down (plant "b").
   "st.LK": normal("st.LK",
-    st({ fTh: -60, fSh: 90, plant: "b" }),
-    st({ fTh: -72, fSh: 8, fFt: 10, torso: -8, bTh: 18, bSh: 10, plant: "b" }), STANDING, 2),
+    st({ ...KICK_LEG, fTh: -60, fSh: 90, plant: "b" }),
+    st({ fTh: -72, fSh: 8, fFt: 10, torso: -8, bTh: 18, bSh: 10, plant: "b" }), KICK_READY, 2),
   "st.MK": normal("st.MK",
-    st({ fTh: -90, fSh: 110, torso: -4, plant: "b" }),
-    st({ fTh: -92, fSh: 4, fFt: 10, torso: -14, chest: -6, head: 6, bTh: 16, bSh: 6, fUA: -30, bUA: -60, bFA: -70, plant: "b" }), STANDING, 4),
+    st({ ...KICK_LEG, fTh: -90, fSh: 110, torso: -4, plant: "b" }),
+    st({ fTh: -92, fSh: 4, fFt: 10, torso: -14, chest: -6, head: 6, bTh: 16, bSh: 6, fUA: -30, bUA: -60, bFA: -70, plant: "b" }), KICK_READY, 4),
   // 🛠️ TRY THIS: change fTh: -125 to -150 for a kick that goes way over their head!
   "st.HK": normal("st.HK",
-    st({ fTh: -110, fSh: 120, torso: -8, chest: -4, fUA: -40, bUA: -10, plant: "b" }),
-    st({ fTh: -125, fSh: 2, fFt: 10, torso: -28, chest: -12, head: 12, bTh: 14, bSh: 4, fUA: -10, fFA: -70, bUA: -70, bFA: -60, plant: "b" }), STANDING, 8),
+    st({ ...KICK_LEG, fTh: -110, fSh: 120, torso: -8, chest: -4, fUA: -40, bUA: -10, plant: "b" }),
+    st({ fTh: -125, fSh: 2, fFt: 10, torso: -28, chest: -12, head: 12, bTh: 14, bSh: 4, fUA: -10, fFA: -70, bUA: -70, bFA: -60, plant: "b" }), KICK_READY, 8),
 
   // Crouching punches. Crouching Heavy Punch swings up to stop jumpers.
   "cr.LP": normal("cr.LP",
@@ -179,14 +191,14 @@ const NORMAL_ANIMS: Record<keyof typeof NORMALS, Animation> = {
 
   // Crouching kicks hit low. The heavy one is a sweep along the floor.
   "cr.LK": normal("cr.LK",
-    cr({ fTh: -70, fSh: 90, plant: "b" }),
-    cr({ fTh: -80, fSh: 30, fFt: 10, torso: 20, plant: "b" }), CROUCHING, 2),
+    cr({ ...CROUCH_KICK_LEG, fTh: -90, fSh: 120, plant: "b" }),
+    cr({ ...CROUCH_KICK_LEG, fTh: -80, fSh: 30, fFt: 10, torso: 20, plant: "b" }), CROUCH_KICK_READY, 2),
   "cr.MK": normal("cr.MK",
-    cr({ fTh: -70, fSh: 70, plant: "b" }),
-    cr({ torso: 26, chest: 14, head: -18, fTh: -84, fSh: 4, fFt: 14, plant: "b" }), CROUCHING, 4),
+    cr({ ...CROUCH_KICK_LEG, fTh: -95, fSh: 110, plant: "b" }),
+    cr({ ...CROUCH_KICK_LEG, torso: 26, chest: 14, head: -18, fTh: -84, fSh: 4, fFt: 14, plant: "b" }), CROUCH_KICK_READY, 4),
   "cr.HK": normal("cr.HK",
-    cr({ fTh: -40, fSh: 120, torso: 24, plant: "b" }),
-    cr({ torso: 34, chest: 16, head: -16, fTh: -86, fSh: 0, fFt: 10, fUA: -60, fFA: -90, bUA: 30, bFA: -20, plant: "b" }), CROUCHING, 8),
+    cr({ ...CROUCH_KICK_LEG, fTh: -70, fSh: 130, torso: 24, plant: "b" }),
+    cr({ ...CROUCH_KICK_LEG, torso: 34, chest: 16, head: -16, fTh: -86, fSh: 0, fFt: 10, fUA: -60, fFA: -90, bUA: 30, bFA: -20, plant: "b" }), CROUCH_KICK_READY, 8),
 
   // Jumping attacks: all in the air (plant ""), angled down at the other fighter.
   "j.LP": normal("j.LP",
@@ -381,8 +393,13 @@ export const ANIMS: Record<string, Animation> = {
     ],
   },
   walkF: { loop: true, keys: STEPS.map((p) => ({ pose: p, frames: 8, ease: "sine" })) },
-  // Walking backward is the same steps in the other order, a little slower.
-  walkB: { loop: true, keys: [STEPS[0]!, STEPS[3]!, STEPS[2]!, STEPS[1]!].map((p) => ({ pose: p, frames: 9, ease: "sine" })) },
+  // Walking backward is the same steps in the other order, a little slower. The two
+  // both-feet-down poses straighten the leg that stays planted for the next step.
+  walkB: {
+    loop: true,
+    keys: [pose({ fTh: -42, fSh: 26, bTh: 28, bSh: 0 }), STEPS[3]!, pose({ fTh: 22, fSh: 0, bTh: -36, bSh: 26 }), STEPS[1]!]
+      .map((p) => ({ pose: p, frames: 9, ease: "sine" })),
+  },
   crouch: {
     loop: true,
     keys: [
@@ -507,6 +524,14 @@ export const ANIMS: Record<string, Animation> = {
 
 // ─── WHICH ANIMATION TO SHOW ────────────────────────────────────────────────
 
+/** Keeps a frame inside its animation: looping ones wrap around, the others stop at their last frame. */
+function inside(name: string, frame: number): { name: string; frame: number } {
+  const a = ANIMS[name]!;
+  const len = animLength(a);
+  const f = Number.isFinite(frame) ? frame : 0;
+  return { name, frame: a.loop ? ((f % len) + len) % len : Math.min(Math.max(f, 0), len) };
+}
+
 /** States that last a set time: their animation stretches to fit, however long the hit or block lasts. */
 function stretched(name: string, f: FighterState): { name: string; frame: number } {
   const len = animLength(ANIMS[name]!);
@@ -515,6 +540,12 @@ function stretched(name: string, f: FighterState): { name: string; frame: number
 
 /** Which animation, and which frame of it, shows what a fighter is doing right now. */
 export function animFor(f: FighterState): { name: string; frame: number } {
+  const { name, frame } = pick(f);
+  return inside(name, frame);
+}
+
+/** The animation for the fighter's state, at a frame that may still be past its end. */
+function pick(f: FighterState): { name: string; frame: number } {
   switch (f.state) {
     case "attack": {
       const atk = f.attack;

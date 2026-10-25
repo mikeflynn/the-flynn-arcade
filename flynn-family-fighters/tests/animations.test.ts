@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  animLength, bodyDims, DEFAULT_LOOK, normalizeLook, plantFeet, samplePose, skeleton, solvePose, STANCE, type Look,
+  animLength, bodyDims, DEFAULT_LOOK, groundOffset, normalizeLook, plantFeet, samplePose, skeleton, solvePose, STANCE, type Look,
 } from "@web-games/rig";
 import { ANIMS, animFor } from "../src/animations";
 import { normalizeFighter, NORMAL_IDS, type Fighter } from "../src/fighter";
@@ -10,6 +10,8 @@ import type { FState, FighterState, MatchState } from "../src/engine/types";
 import { MOVE_TYPES, NORMALS } from "../src/moves";
 import { mySettings } from "../src/settings";
 
+/** How far below the ankle the floor sits (the foot), as in the rig's groundOffset. */
+const FOOT_HEIGHT = 26;
 const total = (a: { startup: number; active: number; recovery: number }) => a.startup + a.active + a.recovery;
 const NAMES = Object.keys(ANIMS);
 const JUMPS = ["jumpUp", "jumpFwd", "jumpBack"];
@@ -98,9 +100,12 @@ describe("poses", () => {
         const plant = typeof pose.plant === "string" ? pose.plant : "fb";
         if (plant === "") return;
         const world = solvePose(rig, plantFeet(rig, pose, dims));
-        const ankles = [...plant].map((side) => world[`${side}Ft`]!.y);
-        const floor = Math.max(...ankles);
-        for (const y of ankles) expect(Math.abs(y - floor), `${name} frame ${frame}`).toBeLessThanOrEqual(1);
+        // The floor the baker stands the sprite on: the lowest ankle of BOTH legs (groundOffset minus the foot).
+        // A planted ankle above it floats; a lifted foot below it would sink through the floor.
+        const floor = groundOffset(world) - FOOT_HEIGHT;
+        for (const side of plant) {
+          expect(Math.abs(world[`${side}Ft`]!.y - floor), `${name} frame ${frame} (${side} foot)`).toBeLessThanOrEqual(1);
+        }
       });
     }
   });
@@ -130,23 +135,55 @@ describe("animFor", () => {
     hitstun: true, blockstun: true, knockdown: true, getup: true, dizzy: true, throwing: true, thrown: true, ko: true, win: true,
   };
 
+  /** stateFrame at the start, the middle, the end and well past the end of a 20-frame state. */
+  const STATE_FRAMES = [0, 10, 20, 35, 500];
+
   function variants(state: FState): FighterState[] {
     const out: FighterState[] = [];
     for (const crouching of [false, true]) {
       for (const jumpDir of [-1, 0, 1] as const) {
-        const f = newMatch().fighters[0];
-        Object.assign(f, { state, crouching, jumpDir, airborne: state === "jump", stateFrame: 3, stateLength: 20 });
-        out.push(f);
+        for (const stateFrame of STATE_FRAMES) {
+          for (const lastHitLevel of ["high", "low"] as const) {
+            const f = newMatch().fighters[0];
+            Object.assign(f, { state, crouching, jumpDir, lastHitLevel, airborne: state === "jump", stateFrame, stateLength: 20 });
+            out.push(f);
+          }
+        }
       }
     }
     return out;
   }
 
-  it.each(Object.keys(STATES) as FState[])("%s maps to an animation that exists", (state) => {
-    for (const f of variants(state)) {
+  /** Every attack (normals and specials, on the ground and rising), at frames from 0 to well past its end. */
+  function attackVariants(): FighterState[] {
+    const out: FighterState[] = [];
+    const attacks = [
+      ...NORMAL_IDS.map((id) => ({ data: { ...NORMALS[id], level: "mid" as const } })),
+      ...SPECIAL_TYPES.map((type) => ({
+        data: { ...MOVE_TYPES[type]!.attack(1, { type, name: "X" }), level: "mid" as const },
+        special: { type, name: "X" },
+      })),
+    ];
+    for (const a of attacks) {
+      const len = total(a.data);
+      for (const frame of [0, Math.floor(len / 2), len, len + 1, len + 200]) {
+        for (const inAir of [false, true]) {
+          const f = newMatch().fighters[0];
+          Object.assign(f, { state: "attack", airborne: inAir, attack: { ...a, frame, hasHit: false, inAir } });
+          out.push(f);
+        }
+      }
+    }
+    return out;
+  }
+
+  const inRange = (name: string, frame: number) => frame >= 0 && frame <= animLength(ANIMS[name]!);
+
+  it.each(Object.keys(STATES) as FState[])("%s maps to an animation that exists, at a frame inside it", (state) => {
+    for (const f of [...variants(state), ...(state === "attack" ? attackVariants() : [])]) {
       const { name, frame } = animFor(f);
       expect(ANIMS[name], `${state} → ${name}`).toBeDefined();
-      expect(Number.isFinite(frame)).toBe(true);
+      expect(inRange(name, frame), `${state} → ${name} frame ${frame} (stateFrame ${f.stateFrame}, attack frame ${f.attack?.frame})`).toBe(true);
     }
   });
 
@@ -163,7 +200,7 @@ describe("animFor", () => {
     for (const type of SPECIAL_TYPES) {
       const data = { ...MOVE_TYPES[type]!.attack(1, { type, name: "X" }), level: "mid" as const };
       Object.assign(f, { state: "attack", attack: { data, frame: 2, hasHit: false, special: { type, name: "X" } } });
-      expect(animFor(f)).toEqual({ name: type, frame: 2 });
+      expect(animFor(f)).toEqual({ name: type, frame: Math.min(2, total(data)) }); // command-throw lasts 1 frame
     }
   });
 
