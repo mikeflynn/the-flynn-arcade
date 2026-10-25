@@ -48,6 +48,7 @@ function createFighterState(fighter: Fighter, x: number, facing: 1 | -1): Fighte
     airborne: false,
     jumpDir: 0,
     hitInAir: false,
+    lastHitLevel: "mid",
     pendingThrow: null,
   };
 }

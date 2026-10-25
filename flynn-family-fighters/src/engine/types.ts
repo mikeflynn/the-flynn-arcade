@@ -91,6 +91,8 @@ export interface FighterState {
   jumpDir: -1 | 0 | 1;
   /** Hit while in the air: no more attacking until they land. */
   hitInAir: boolean;
+  /** The level of the last hit that landed ("low" shows the doubled-over hit pose). */
+  lastHitLevel: AttackData["level"];
   /** While `thrown` (with throw tech on): who grabbed this fighter and which way, until the throw lands. */
   pendingThrow: { by: 0 | 1; back: boolean; damage: number; dizzy: number } | null;
 }

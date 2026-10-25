@@ -338,6 +338,7 @@ export function applyContact(
   def.health = Math.max(0, def.health - damage);
   def.attack = null; // getting hit interrupts whatever they were doing
   def.hitInAir = def.airborne;
+  def.lastHitLevel = a.level;
   if (a.knockdown) knockDown(def);
   else if (!wasDizzy) setTimed(def, "hitstun", a.hitstun); // a dizzy fighter stays dizzy
   events.push({ type: "hit", player: i, x, y, name: a.id, damage });

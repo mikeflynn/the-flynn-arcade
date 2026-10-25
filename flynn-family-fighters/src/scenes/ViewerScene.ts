@@ -1,16 +1,17 @@
 import Phaser from "phaser";
-import { shownFrame } from "@web-games/rig";
+import { animLength, shownFrame } from "@web-games/rig";
 import { bakeFighter, type BakedFighter } from "@web-games/rig/canvas";
 import { FighterSprite } from "@web-games/rig/phaser";
-import { animations } from "../animations";
+import { ANIMS } from "../animations";
 import type { Fighter } from "../fighter";
 import { KNOWN_MOVE_TYPES } from "../moves";
 import { loadRoster } from "../roster";
 import { FPS_CHOICES, settings, type Fps } from "../settings";
 
 const FLOOR_Y = 420;
-const SHOW = ["stance", "idle", "walk"];
-const FRAMES_PER_ANIMATION = 150; // 2.5 seconds each
+const NAMES = Object.keys(ANIMS);
+/** A non-looping animation pauses on its last frame this long before it plays again. */
+const REPLAY_PAUSE = 40;
 const ZOOM = 3;
 
 interface Entry {
@@ -23,11 +24,18 @@ let textureCounter = 0;
 /** Every sprite needs its own texture name, or two fighters would erase each other's pictures. */
 const newKey = (id: string) => `fighter-${id}-${textureCounter++}`;
 
-/** ?viewer: a lineup of every fighter, to check how they look and move. C = close-up, F = change fps. */
+/**
+ * ?viewer: a lineup of every fighter, to check how they look and move.
+ * N = next animation, C = close-up, F = change fps.
+ * For screenshots: ?viewer&anim=st.HK starts on that animation, &frame=8 freezes it on frame 8,
+ * and &close opens the close-up.
+ */
 export class ViewerScene extends Phaser.Scene {
   private entries: Entry[] = [];
   private fps: Fps = settings.animationFps;
   private frame = 0;
+  private animIndex = 0;
+  private frozenFrame?: number;
   private info!: Phaser.GameObjects.Text;
   private closeUp?: HTMLCanvasElement;
 
@@ -42,9 +50,16 @@ export class ViewerScene extends Phaser.Scene {
     this.add.rectangle(480, FLOOR_Y, 960, 4, 0x1a1c2c);
     this.info = this.add.text(16, 12, "loading...", { fontFamily: "monospace", fontSize: "20px", color: "#ffffff" });
 
+    const params = new URLSearchParams(window.location.search);
+    this.animIndex = Math.max(0, NAMES.indexOf(params.get("anim") ?? ""));
+    const frozen = Number(params.get("frame") ?? NaN);
+    if (Number.isFinite(frozen)) this.frozenFrame = frozen;
+
+    this.input.keyboard!.on("keydown-N", () => this.nextAnimation());
     this.input.keyboard!.on("keydown-C", () => this.toggleCloseUp());
     this.input.keyboard!.on("keydown-F", () => this.nextFps());
     this.events.once("shutdown", () => this.closeUp?.remove());
+    if (params.has("close")) this.toggleCloseUp();
 
     void this.build();
   }
@@ -53,7 +68,7 @@ export class ViewerScene extends Phaser.Scene {
     const { fighters, problems } = await loadRoster(KNOWN_MOVE_TYPES);
     problems.forEach((p) => console.warn(`🥊 ${p}`));
     fighters.forEach((fighter, i) => {
-      const baked = bakeFighter(fighter.look, animations, { fps: this.fps });
+      const baked = bakeFighter(fighter.look, ANIMS, { fps: this.fps });
       const sprite = new FighterSprite(this, newKey(fighter.id), baked).setPosition((960 * (i + 1)) / (fighters.length + 1), FLOOR_Y);
       this.entries.push({ fighter, baked, sprite });
     });
@@ -63,17 +78,30 @@ export class ViewerScene extends Phaser.Scene {
   private nextFps(): void {
     this.fps = FPS_CHOICES[(FPS_CHOICES.indexOf(this.fps) + 1) % FPS_CHOICES.length]!;
     for (const e of this.entries) {
-      e.baked = bakeFighter(e.fighter.look, animations, { fps: this.fps });
+      e.baked = bakeFighter(e.fighter.look, ANIMS, { fps: this.fps });
       e.sprite.setBaked(newKey(e.fighter.id), e.baked);
     }
     this.printInfo([]);
   }
 
+  private nextAnimation(): void {
+    this.animIndex = (this.animIndex + 1) % NAMES.length;
+    this.frame = 0;
+    this.frozenFrame = undefined;
+    this.printInfo([]);
+  }
+
   private printInfo(problems: string[]): void {
-    const lines = [`FPS ${this.fps}   [C] close-up   [F] change fps`];
+    const anim = NAMES[this.animIndex]!;
+    const lines = [
+      `FPS ${this.fps}   [N] next animation   [C] close-up   [F] change fps`,
+      `${anim} (${this.animIndex + 1}/${NAMES.length}), ${animLength(ANIMS[anim]!)} frames${this.frozenFrame === undefined ? "" : `, frozen at ${this.frozenFrame}`}`,
+    ];
     for (const e of this.entries) {
       const frames = e.baked.frames.length;
-      lines.push(`${e.fighter.name}: ${frames} frames, ${e.baked.colors} colors, baked in ${e.baked.ms} ms`);
+      // Each page pixel takes 4 bytes (red, green, blue, alpha).
+      const mb = e.baked.pages.reduce((sum, p) => sum + p.width * p.height * 4, 0) / 1e6;
+      lines.push(`${e.fighter.name}: ${frames} frames, ${e.baked.colors} colors, baked in ${e.baked.ms} ms, ${e.baked.pages.length} pages ${mb.toFixed(1)} MB`);
     }
     problems.forEach((p) => lines.push(p));
     this.info.setText(lines);
@@ -81,8 +109,9 @@ export class ViewerScene extends Phaser.Scene {
 
   update(): void {
     this.frame++;
-    const anim = SHOW[Math.floor(this.frame / FRAMES_PER_ANIMATION) % SHOW.length]!;
-    const local = this.frame % FRAMES_PER_ANIMATION;
+    const anim = NAMES[this.animIndex]!;
+    const a = ANIMS[anim]!;
+    const local = this.frozenFrame ?? (a.loop ? this.frame : this.frame % (animLength(a) + REPLAY_PAUSE));
     for (const e of this.entries) e.sprite.show(anim, local);
     if (this.closeUp) this.drawCloseUp(anim, local);
   }
