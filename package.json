@@ -4,6 +4,7 @@
   "workspaces": [
     "lib/*",
     "super-flynn-bros",
+    "flynn-family-fighters",
     "arcade"
   ],
   "scripts": {
