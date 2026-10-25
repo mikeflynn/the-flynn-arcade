@@ -16,6 +16,8 @@
 // once ("key ghosting"). Gamepads work best for 2 players.
 //
 // 🛠️ TRY THIS: swap your punches and kicks around until they feel right!
+// (Keep player 1's and player 2's keys different: only "start" and "mute" may
+// share a key. If both players get the same key, `npm test` will tell you.)
 
 import type { Bindings, InputManager, PadBindings } from "@web-games/input";
 import { B, type InputFrame } from "./engine/input";

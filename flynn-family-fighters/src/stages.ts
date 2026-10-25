@@ -92,7 +92,7 @@ const isColor = (v: unknown): v is string => typeof v === "string" && /^#[0-9a-f
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** The track as it first came, for any stage that's missing a color (even if the track above gets changed). */
-const DEFAULT_STAGE: StageDef = {
+export const DEFAULT_STAGE: StageDef = {
   id: "track",
   name: "THE TRACK",
   sky: ["#4a2378", "#ffa64a"],

@@ -1,29 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { normalizeStage, STAGES } from "../src/stages";
+import { DEFAULT_STAGE, normalizeStage, STAGES } from "../src/stages";
+
+// stages.ts is a kid file: kids add stages and recolor them. These tests only
+// check things that stay true after those edits.
 
 describe("STAGES", () => {
-  it("has the four starter stages, with the track first", () => {
-    expect(STAGES.map((s) => s.id)).toEqual(["track", "schoolyard", "ballfield", "backyard"]);
-  });
-
-  it("are all already tidy (normalizing changes nothing and warns about nothing)", () => {
-    for (const stage of STAGES) {
-      const warnings: string[] = [];
-      expect(normalizeStage(stage, (m) => warnings.push(m))).toEqual(stage);
-      expect(warnings).toEqual([]);
-    }
+  it("still has the four starter stages (kids can add more)", () => {
+    const ids = STAGES.map((s) => s.id);
+    for (const id of ["track", "schoolyard", "ballfield", "backyard"]) expect(ids).toContain(id);
   });
 });
 
 describe("normalizeStage", () => {
+  it("leaves the default stage exactly as it is, with no warnings", () => {
+    const warnings: string[] = [];
+    expect(normalizeStage(DEFAULT_STAGE, (m) => warnings.push(m))).toEqual(DEFAULT_STAGE);
+    expect(warnings).toEqual([]);
+  });
+
   it("fixes a broken sky with a warning, keeps the id and fills in the rest", () => {
     const warnings: string[] = [];
     const stage = normalizeStage({ id: "moon", sky: ["nope"] }, (m) => warnings.push(m));
     expect(stage.id).toBe("moon");
     expect(stage.name).toBe("MOON");
-    expect(stage.sky).toEqual(STAGES[0]!.sky);
-    expect(stage.mountains).toEqual(STAGES[0]!.mountains);
-    expect(stage.floor).toBe(STAGES[0]!.floor);
+    expect(stage.sky).toEqual(DEFAULT_STAGE.sky);
+    expect(stage.mountains).toEqual(DEFAULT_STAGE.mountains);
+    expect(stage.floor).toBe(DEFAULT_STAGE.floor);
     expect(warnings.some((w) => w.includes("sky"))).toBe(true);
   });
 
@@ -36,7 +38,7 @@ describe("normalizeStage", () => {
 
   it("turns something that isn't a stage at all into the default stage", () => {
     const warnings: string[] = [];
-    expect(normalizeStage(42, (m) => warnings.push(m))).toEqual(STAGES[0]);
+    expect(normalizeStage(42, (m) => warnings.push(m))).toEqual(DEFAULT_STAGE);
     expect(warnings).toHaveLength(1);
   });
 
