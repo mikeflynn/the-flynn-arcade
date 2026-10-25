@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_LOOK } from "../src/look";
 import { bodyDims } from "../src/body";
 import { skeleton } from "../src/skeleton";
-import { groundOffset, plantFeet, solvePose, type Pose } from "../src/kinematics";
+import { groundOffset, plantFeet, solvePose } from "../src/kinematics";
+import type { Pose } from "../src/pose";
 
 const d = bodyDims(DEFAULT_LOOK);
 const bones = skeleton(d);

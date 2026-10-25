@@ -5,3 +5,4 @@ export * from "./look";
 export * from "./body";
 export * from "./skeleton";
 export * from "./kinematics";
+export * from "./pose";

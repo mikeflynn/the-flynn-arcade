@@ -1,8 +1,7 @@
 import type { BodyDims } from "./body";
+import type { Pose } from "./pose";
 import type { Bone } from "./skeleton";
 
-/** Joint angles in degrees by name (plus `plant`). Task 4 moves this to pose.ts. */
-export type Pose = Record<string, number | string>;
 export type World = Record<string, { x: number; y: number; r: number }>;
 
 const RAD = Math.PI / 180;
