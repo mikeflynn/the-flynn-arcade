@@ -12,6 +12,9 @@
     "typecheck": "tsc",
     "test": "vitest run"
   },
+  "dependencies": {
+    "@web-games/settings": "*"
+  },
   "peerDependencies": {
     "phaser": "3.90.0"
   },
