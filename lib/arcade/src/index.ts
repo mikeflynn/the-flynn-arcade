@@ -45,6 +45,8 @@ export interface GameInfo {
   screenArt: { colors: Record<string, string>; art: string[] };
   /** Optional: how the capture script plays this game to record its clip. */
   capture?: CapturePlan;
+  /** @deprecated Games used to have cabinet colors. The poster ignores them; old files still work. */
+  colors?: unknown;
 }
 
 export const TAGLINE_MAX = 40;
@@ -105,7 +107,7 @@ function captureOk(c: unknown): boolean {
  * field is dropped with a note, and the game still shows up.
  */
 function cleaned(info: GameInfo, note: (message: string) => void): GameInfo {
-  const { colors: _oldCabinetColors, tagline, capture, ...game } = info as GameInfo & { colors?: unknown };
+  const { colors: _oldCabinetColors, tagline, capture, ...game } = info;
   const result: GameInfo = { ...game };
   if (tagline !== undefined) {
     const text = typeof tagline === "string" ? tagline.trim() : "";

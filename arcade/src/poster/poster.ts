@@ -1,7 +1,7 @@
 import { playerLabel } from "../badges";
-import { safeColor } from "../colors";
+import { safeColor, textList } from "../colors";
 import type { GameMedia } from "../media";
-import type { Slot } from "../selection";
+import { mouseMoved, type Slot } from "../selection";
 import { colors, logoLines, settings, tickerBottom, tickerTop } from "../settings";
 import { tickerLine } from "../ticker";
 import { Panel } from "./panel";
@@ -96,7 +96,7 @@ export function buildPoster(root: HTMLElement, data: PosterData): PosterView {
   // The logo row: giant words plus the little stamp box.
   const logoRow = el("header", "logo-row");
   const logo = el("h1", "logo");
-  logoLines.forEach((line) => logo.append(el("span", "", line)));
+  textList(logoLines, ["FLYNN", "ARCADE"]).forEach((line) => logo.append(el("span", "", line)));
   const stamp = el("div", "stamp");
   const credit = el("span", "credit", "CREDITS ∞");
   const stampName = el("strong", "");
@@ -127,9 +127,13 @@ export function buildPoster(root: HTMLElement, data: PosterData): PosterView {
 
   const startBanner = el("div", "game-start", "GAME START!");
   const fade = el("div", "fade");
-  root.append(ticker("top", tickerTop, data.gameCount), logoRow, bar, grid, ticker("bottom", tickerBottom, data.gameCount), startBanner, fade);
+  const top = ticker("top", textList(tickerTop, ["INSERT COIN"]), data.gameCount);
+  const bottom = ticker("bottom", textList(tickerBottom, ["ENTER TO PLAY"]), data.gameCount);
+  root.append(top, logoRow, bar, grid, bottom, startBanner, fade);
 
   fitLogoWhenReady(logo);
+  // When the window changes shape the panels move around: keep the selected one on screen.
+  new ResizeObserver(() => panels[selected]?.el.scrollIntoView({ block: "nearest", inline: "nearest" })).observe(grid);
 
   let selected = -1;
   let typing = 0;
@@ -172,7 +176,14 @@ export function buildPoster(root: HTMLElement, data: PosterData): PosterView {
       return Math.max(1, tracks.length);
     },
     onHover(fn) {
-      panels.forEach((p, i) => p.el.addEventListener("pointerenter", (e) => e.pointerType === "mouse" && fn(i)));
+      let last: { x: number; y: number } | null = null;
+      panels.forEach((p, i) =>
+        p.el.addEventListener("pointermove", (e) => {
+          if (e.pointerType !== "mouse" || !mouseMoved(last, e.clientX, e.clientY)) return;
+          last = { x: e.clientX, y: e.clientY };
+          if (i !== selected) fn(i);
+        }),
+      );
     },
     onClick(fn) {
       panels.forEach((p, i) => p.el.addEventListener("click", () => fn(i)));

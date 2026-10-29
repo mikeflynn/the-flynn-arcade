@@ -48,3 +48,12 @@ export function moveSelection(index: number, dir: Direction, columns: number, co
   const next = index + (dir === "down" ? cols : -cols);
   return next >= 0 && next < count ? next : index;
 }
+
+/**
+ * Did the mouse really move? When the panels scroll under a mouse that's
+ * sitting still, the browser says the mouse "entered" a new panel; that
+ * shouldn't steal the selection.
+ */
+export function mouseMoved(last: { x: number; y: number } | null, x: number, y: number): boolean {
+  return last === null || last.x !== x || last.y !== y;
+}

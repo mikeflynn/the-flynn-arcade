@@ -71,7 +71,8 @@ export class ArcadeController {
     const pointer = this.pending;
     this.pending = [];
     const anyPress = pressed("start") || pressed("mute") || DIRECTIONS.some(pressed);
-    if (anyPress || pointer.length > 0) this.wakeUp();
+    // A hover isn't a real press, so the browser wouldn't let the music start yet.
+    if (anyPress || pointer.some((p) => p.kind === "click")) this.wakeUp();
 
     if (pressed("mute")) this.deps.saveMuted(audio.toggleMute());
 

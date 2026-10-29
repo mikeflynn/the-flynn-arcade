@@ -115,6 +115,15 @@ describe("ArcadeController", () => {
     expect(t.c.starting).toBe(true);
   });
 
+  it("starts the music on a key press or click, not on a mouse hover (browsers block sound before a real press)", () => {
+    const t = setup();
+    t.hover(1);
+    t.frame(10);
+    expect(t.calls).not.toContain("music arcade");
+    t.frame(20, "right");
+    expect(t.calls).toContain("music arcade");
+  });
+
   it("shows off the games by itself after a while, quietly, and a press just wakes it up", () => {
     const t = setup();
     t.frame(settings.attractDelayMs + 1);

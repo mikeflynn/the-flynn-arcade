@@ -12,6 +12,20 @@ const game = (overrides: Partial<GameInfo> = {}): GameInfo => ({
 });
 
 describe("validateGames", () => {
+  it("lets an old arcade.ts with cabinet colors still typecheck (kid files never turn CI red)", () => {
+    // Written as a typed literal on purpose: `npm run typecheck` is the real test here.
+    const oldFile: GameInfo = {
+      id: "space-pong",
+      title: "SPACE PONG",
+      blurb: "",
+      players: { min: 1, max: 2, coop: false },
+      colors: { primary: "#ff0000", secondary: "#00ff00" },
+      devPort: 8002,
+      screenArt: { colors: {}, art: [] },
+    };
+    expect(validateGames([{ folder: "space-pong", info: oldFile }], vi.fn())).toHaveLength(1);
+  });
+
   it("still accepts an old arcade.ts that has cabinet colors, and drops them", () => {
     const warn = vi.fn();
     const old = { ...game(), colors: { primary: "#000000", secondary: "#ffffff" } };

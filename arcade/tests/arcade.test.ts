@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import type { GameInfo } from "@web-games/arcade";
 import { mySettings } from "../src/settings";
 import { settingLimits } from "../src/limits";
-import { buildSlots, initialIndex, moveSelection, nextAttractIndex, wrap } from "../src/selection";
+import { buildSlots, initialIndex, moveSelection, mouseMoved, nextAttractIndex, wrap } from "../src/selection";
 import { AttractClock } from "../src/attract";
 import { mediaByGame, pictureFor } from "../src/media";
 import { drawScreenArt } from "../src/screenArt";
 import { loadArcadeSettings, saveArcadeSettings, type StorageLike } from "../src/storage";
 import { collectRegistrations, folderOf, loadGames } from "../src/games";
 import { playerLabel } from "../src/badges";
-import { safeColor } from "../src/colors";
+import { safeColor, textList } from "../src/colors";
 import { tickerLine } from "../src/ticker";
 import { logoLines, settings, tickerBottom, tickerTop } from "../src/settings";
 
@@ -24,9 +24,9 @@ const game = (id: string): GameInfo => ({
 
 describe("settings.ts", () => {
   // Only shape checks here: kids are invited to change these values (CLAUDE.md §7).
-  it("has a safe range for every number, and every number stays inside it", () => {
-    const numbers = Object.entries(mySettings).filter(([, v]) => typeof v === "number").map(([k]) => k);
-    expect(Object.keys(settingLimits).sort()).toEqual(numbers.sort());
+  it("has a setting for every safe range, and every number ends up inside it", () => {
+    // A typo like tickerSecondsPerLoop: "fast" only warns (clampSettings fixes it), so it mustn't fail here.
+    for (const key of Object.keys(settingLimits)) expect(key in mySettings).toBe(true);
     for (const [key, range] of Object.entries(settingLimits)) {
       const value = settings[key as keyof typeof settings] as number;
       expect(value).toBeGreaterThanOrEqual(range.min);
@@ -50,6 +50,20 @@ describe("colors", () => {
     expect(safeColor("red", "#18171b")).toBe("#18171b");
     expect(safeColor(undefined, "#18171b")).toBe("#18171b");
     expect(safeColor("#fff", "#18171b")).toBe("#18171b");
+  });
+});
+
+describe("textList", () => {
+  it("keeps a list of words", () => {
+    expect(textList(["FLYNN", "ARCADE"], ["X"])).toEqual(["FLYNN", "ARCADE"]);
+  });
+  it("turns plain words (instead of a list) into a list, so the poster still shows up", () => {
+    expect(textList("MAYA'S ARCADE", ["X"])).toEqual(["MAYA'S ARCADE"]);
+    expect(textList(42, ["X"])).toEqual(["42"]);
+  });
+  it("uses the fallback when there's nothing there", () => {
+    expect(textList(undefined, ["FLYNN"])).toEqual(["FLYNN"]);
+    expect(textList([], ["FLYNN"])).toEqual(["FLYNN"]);
   });
 });
 
@@ -178,6 +192,16 @@ describe("moveSelection", () => {
   });
   it("is 0 with no panels", () => {
     expect(moveSelection(0, "right", 3, 0)).toBe(0);
+  });
+});
+
+describe("mouseMoved", () => {
+  it("is true for the first move and when the mouse really moves", () => {
+    expect(mouseMoved(null, 10, 10)).toBe(true);
+    expect(mouseMoved({ x: 10, y: 10 }, 12, 10)).toBe(true);
+  });
+  it("is false when a panel slides under a mouse that's sitting still", () => {
+    expect(mouseMoved({ x: 10, y: 10 }, 10, 10)).toBe(false);
   });
 });
 
