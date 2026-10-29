@@ -119,8 +119,8 @@ The starting values are: `logoLines` `["FLYNN", "ARCADE"]`, colors
   `npm run capture -w arcade -- <game-id>` for one). It starts the game's dev
   server, plays it in a hidden Chromium using the recipe's key presses, and
   writes `<game>/arcade-media/screenshot.png` and `clip.mp4` (960 wide; aim for
-  under 300 KB and 1.5 MB). Commit them. Needs `ffmpeg` and
-  `npx playwright install chromium` once. It never runs in CI or Docker.
+  under 300 KB and 1.5 MB). Commit them. Needs `ffmpeg` and Google Chrome
+  (or `npx playwright install chromium` once). It never runs in CI or Docker.
   Re-record after a game's look changes.
 - **Adding a game:** see `CLAUDE.md` §9 and §10. In short, add
   `<game>/arcade.ts` (with a `tagline` and a `capture` recipe), run the capture

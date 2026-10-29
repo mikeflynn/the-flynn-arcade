@@ -288,8 +288,8 @@ themselves stay Phaser.
 - **Pictures:** each game may have `<game-name>/arcade-media/screenshot.png`
   and `clip.mp4` (silent, 5–8 s, 960 wide, under ~300 KB / ~1.5 MB). Make them
   with `npm run capture -w arcade -- <game-name>`, which plays the game in a
-  hidden browser using the `capture` recipe (needs `ffmpeg` and
-  `npx playwright install chromium`), and commit them. Without them the
+  hidden browser using the `capture` recipe (needs `ffmpeg` and Google Chrome,
+  or `npx playwright install chromium`), and commit them. Without them the
   panel shows the `screenArt`.
 - **Look:** the poster stays monochrome (`arcade/src/settings.ts` colors) so
   the games' pictures are the only color. Don't add per-game colors to it.

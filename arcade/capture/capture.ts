@@ -6,14 +6,15 @@
 //   npm run capture -w arcade -- super-flynn-bros     just one game
 //
 // It writes <game>/arcade-media/screenshot.png and clip.mp4; commit them.
-// Needs ffmpeg (https://ffmpeg.org, or `brew install ffmpeg`) and Playwright's
-// browser (`npx playwright install chromium`, once).
+// The game's own page records its canvas; ffmpeg turns that into an MP4.
+// Needs ffmpeg (https://ffmpeg.org, or `brew install ffmpeg`) and Google Chrome
+// (or Playwright's browser: `npx playwright install chromium`, once).
 //
 // How each game is played comes from the `capture` block in its arcade.ts.
 // This never runs in CI, tests or Docker.
 
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -103,6 +104,17 @@ function report(file: string, limit: number): void {
   console.log(`   ${file.replace(ROOT + "/", "")}: ${kb} KB${size > limit ? `  ⚠️ bigger than ${Math.round(limit / 1024)} KB, try a shorter clipMs` : ""}`);
 }
 
+/** The Google Chrome already on this computer if there is one, otherwise Playwright's own Chromium. */
+async function launchBrowser() {
+  const args = ["--autoplay-policy=no-user-gesture-required"];
+  try {
+    return await chromium.launch({ channel: "chrome", args });
+  } catch {
+    // The full Chromium (not the smaller "headless shell"), so `npx playwright install chromium` is all it needs.
+    return await chromium.launch({ channel: "chromium", args });
+  }
+}
+
 async function capture(game: GameInfo): Promise<void> {
   const plan = game.capture!;
   const warmupMs = plan.warmupMs ?? 3000;
@@ -116,40 +128,55 @@ async function capture(game: GameInfo): Promise<void> {
 
   let browser;
   try {
-    // The full Chromium (not the smaller "headless shell"), so `npx playwright install chromium` is all it needs.
-    browser = await chromium.launch({ channel: "chromium", args: ["--autoplay-policy=no-user-gesture-required"] });
+    browser = await launchBrowser();
   } catch (error) {
     stopServer(server);
     const message = (error as Error).message;
     fail(
       /Executable doesn't exist|install/i.test(message)
-        ? "Playwright's browser isn't installed. Run: npx playwright install chromium"
+        ? "No browser to record with. Install Google Chrome, or run: npx playwright install chromium"
         : `The browser wouldn't start:\n${message.split("\n")[0]}`,
     );
   }
   try {
-    const context = await browser.newContext({ viewport: VIEWPORT, recordVideo: { dir: work, size: VIEWPORT } });
+    const context = await browser.newContext({ viewport: VIEWPORT });
     const page = await context.newPage();
-    const recordingStarted = Date.now();
     await page.goto(`http://localhost:${game.devPort}/${plan.query ?? ""}`);
     await sleep(warmupMs);
     // Click the game once so it has keyboard focus (and the browser allows sound).
     const canvas = page.locator("canvas").first();
     await canvas.click({ position: { x: 5, y: 5 } }).catch(() => {});
-    const offset = (Date.now() - recordingStarted) / 1000;
-    const box = await canvas.boundingBox();
+
+    // The page records its own game canvas with the browser's built-in recorder.
+    await canvas.evaluate((c: HTMLCanvasElement) => {
+      const recorder = new MediaRecorder(c.captureStream(30), { mimeType: "video/webm", videoBitsPerSecond: 8_000_000 });
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.start(250);
+      (window as unknown as { capture: unknown }).capture = { recorder, chunks };
+    });
     const rawShot = join(work, "shot.png");
     await play(page, plan, clipMs, async () => {
       await canvas.screenshot({ path: rawShot });
     });
-    const video = page.video();
-    await context.close(); // finishes writing the video
-    const raw = await video!.path();
+    const base64 = await page.evaluate(async () => {
+      const { recorder, chunks } = (window as unknown as { capture: { recorder: MediaRecorder; chunks: Blob[] } }).capture;
+      await new Promise((done) => {
+        recorder.onstop = done;
+        recorder.stop();
+      });
+      const bytes = new Uint8Array(await new Blob(chunks).arrayBuffer());
+      let text = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(text);
+    });
+    await context.close();
+    const raw = join(work, "raw.webm");
+    writeFileSync(raw, Buffer.from(base64, "base64"));
 
-    // Just the game's picture (no page border), 960 wide.
-    const crop = box ? `crop=${Math.floor(box.width / 2) * 2}:${Math.floor(box.height / 2) * 2}:${Math.round(box.x)}:${Math.round(box.y)},` : "";
+    // 960 wide. Games are pixel art, so the clip is scaled with hard pixel edges.
     const clip = join(outDir, "clip.mp4");
-    ffmpeg(["-ss", offset.toFixed(2), "-t", (clipMs / 1000).toFixed(2), "-i", raw, "-an", "-vf", `${crop}scale=${OUTPUT_WIDTH}:-2:flags=lanczos,fps=30`, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-profile:v", "main", "-crf", "28", "-movflags", "+faststart", clip]);
+    ffmpeg(["-i", raw, "-t", (clipMs / 1000).toFixed(2), "-an", "-vf", `scale=${OUTPUT_WIDTH}:-2:flags=neighbor,fps=30`, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-profile:v", "main", "-crf", "28", "-movflags", "+faststart", clip]);
     const screenshot = join(outDir, "screenshot.png");
     ffmpeg(["-i", rawShot, "-vf", `scale=${OUTPUT_WIDTH}:-2:flags=lanczos`, screenshot]);
     report(screenshot, SCREENSHOT_LIMIT);
