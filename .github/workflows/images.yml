@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [super-flynn-bros, arcade]
+        service: [super-flynn-bros, flynn-family-fighters, arcade]
     env:
       IMAGE: ghcr.io/${{ github.repository }}/${{ matrix.service }}
       PUBLISH: ${{ github.event_name != 'pull_request' }}

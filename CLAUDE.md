@@ -24,12 +24,14 @@ the-flynn-arcade/
 ├── package.json           # npm workspaces root (games, arcade, lib/*, server)
 ├── arcade/                # The Flynn Arcade: the game picker everyone starts from (port 8000)
 ├── server/                # Universal multiplayer server (only if a game needs it)
+├── .claude/skills/        # Project skills, e.g. /add-fighter (§8)
 ├── lib/                   # Shared libraries, one package per subdirectory
 │   ├── input/             #   keyboard + gamepad actions per player
 │   ├── pixel-art/         #   text-grid pixel art → Phaser textures
 │   ├── audio/             #   optional sounds/music, skipped when missing
 │   ├── settings/          #   clamp kid-edited numbers into safe ranges
-│   └── arcade/            #   GameInfo + links between the arcade and games
+│   ├── arcade/            #   GameInfo + links between the arcade and games
+│   └── rig/               #   paper-doll SF2-style characters drawn from a Look
 └── <game-name>/           # One directory per game, at the repo root
     └── arcade.ts          #   how the game shows up in the arcade (§10)
 ```
@@ -114,7 +116,8 @@ Each game's `README.md` must include:
 | arcade   | 8000      | The Flynn Arcade game picker (front door) |
 | server   | 3000      | Multiplayer WebSocket server (reserved) |
 | super-flynn-bros | 8001 | 8-bit side scroller (1–2 players, local) |
-| _(next game)_ | 8002 | Games get 8001, 8002, … in order |
+| flynn-family-fighters | 8002 | SF2-style family fighting game (1–2 players, local) |
+| _(next game)_ | 8003 | Games get 8001, 8002, 8003, … in order |
 
 Vite dev servers use the same port as the game's host port, so
 `npm run dev -w <game-name>` and Docker never disagree.
@@ -158,6 +161,7 @@ rather than special-casing one game in the core.
   - `lib/audio` — optional sounds and music, quiet when files are missing
   - `lib/settings` — `clampSettings` for kid-edited numbers
   - `lib/arcade` — `GameInfo`, validation, arcade ↔ game URLs
+  - `lib/rig` — paper-doll SF2-style characters drawn from a `Look`
 - Candidates (create when first needed, not ahead of time):
   - `lib/net` — multiplayer client (connect, rooms, send/receive, reconnect)
   - `lib/ui` — shared menus, lobby screen, room-code entry
@@ -220,6 +224,7 @@ At minimum, include:
   `typecheck`.
 - Games should support keyboard at minimum; gamepad support via `lib/input`
   where it makes sense; touch where practical.
+- Project skills live in `.claude/skills/<name>/SKILL.md`.
 - Keep assets small and checked into the game's `public/` directory; note the
   source/license of any third-party asset in the game's README.
 
@@ -272,6 +277,11 @@ game cabinet. It's a Vite + Phaser app like the games.
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-28 — Second game: Flynn Family Fighters on port 8002. Added
+  `lib/rig` (paper-doll characters drawn from a `Look`) and project skills in
+  `.claude/skills/`. Games 8001 and 8002 now both have Docker, prod, CI and
+  arcade entries.
 
 - 2026-10-22 — Images are built and published by GitHub Actions
   (`.github/workflows/images.yml`, ghcr.io, amd64 + arm64); the server only

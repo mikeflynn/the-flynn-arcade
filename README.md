@@ -29,6 +29,7 @@ hit save, you can change a game.
 | Game | What it is | Players | Make-it-your-own ideas |
 | ---- | ---------- | ------- | ---------------------- |
 | [**Super Flynn Bros**](super-flynn-bros/) 🏃 | An 8-bit side scroller: help Colin and Ryan walk to school, practice, and back home through Woodland Hills. Dodge dogs and sprinklers, grab donuts! 🍩 | 1–2 (co-op) | Make the hero look like you, change gravity for moon jumps, invent new hazards, build your own street |
+| [**Flynn Family Fighters**](flynn-family-fighters/) 🥊 | A street-fighter-style showdown! Pick a Flynn, throw fireballs, uppercut your way up the ladder, and win the tournament. Beat the computer, or fight a friend! 🔥 | 1–2 (versus) | Make a fighter that looks like you, name your own special moves, draw your own head, build a new stage, make fireballs faster |
 
 Every game has its own folder with a `README.md` that tells you:
 - **How to play:** the controls and the goal

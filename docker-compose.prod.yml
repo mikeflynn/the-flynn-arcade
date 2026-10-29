@@ -34,3 +34,9 @@ services:
     build: !reset null
     pull_policy: always
     ports: !reset []
+
+  flynn-family-fighters:
+    image: ${IMAGE_PREFIX:-ghcr.io/mikeflynn/the-flynn-arcade}/flynn-family-fighters:${IMAGE_TAG:-latest}
+    build: !reset null
+    pull_policy: always
+    ports: !reset []

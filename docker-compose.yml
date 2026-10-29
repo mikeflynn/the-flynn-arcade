@@ -18,6 +18,14 @@ services:
       - "8001:80"
     restart: unless-stopped
 
+  flynn-family-fighters:
+    build:
+      context: .
+      dockerfile: flynn-family-fighters/Dockerfile
+    ports:
+      - "8002:80"
+    restart: unless-stopped
+
   # The front door: http://localhost:8000 (forwards /<game-id>/ to each game).
   arcade:
     build:
@@ -27,4 +35,5 @@ services:
       - "8000:80"
     depends_on:
       - super-flynn-bros
+      - flynn-family-fighters
     restart: unless-stopped
