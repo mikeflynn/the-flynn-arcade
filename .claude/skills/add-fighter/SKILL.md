@@ -31,14 +31,14 @@ Talk in a warm, playful, kid-friendly voice. Keep questions short.
 Ask in this order, one question each:
 
 1. First name, and body frame (`BODY_FRAMES`: boy/man or girl/woman look).
-2. Fighting style (`ARCHETYPES`: martial artist or street brawler) and how over-the-top muscly (`muscle`, within `LOOK_LIMITS`).
+2. Fighting style (`ARCHETYPES`: martial artist or street brawler) and how over-the-top muscly (`muscle`, within `LOOK_LIMITS`). `height` and `muscle` are numbers and must stay inside `LOOK_LIMITS` (read the min/max from `look.ts`).
 3. How tall compared to others (`height`) and body `build`.
 4. Skin, hair and eye colors (ask in words, turn them into `#rrggbb`), and hairstyle (`HAIR_STYLES`).
-5. Face details: jaw, brows, eyes, nose, freckles, glasses. Likeness lives here.
+5. Face details: jaw, brows, eyes, nose, freckles, glasses. Likeness lives here. (Freckles go in `look.face.freckles`; glasses and sunglasses are `EXTRAS` entries and go in `look.extras`.)
 6. Favorite clothes and colors (top, bottom, belt, shoes, accent), then an accessory (`EXTRAS`) and a weapon or prop (`WEAPONS`).
 7. Personality, to guide the stats ("speedy? strong? tough? bouncy?").
 8. Two or three signature moves: describe each, then give it a fun name.
-9. A win quote (short and friendly) and a home stage (`STAGES`, ask by stage `name`).
+9. A win quote (short and friendly) and a home stage (`STAGES`: show the person the stage `name`s, but write the matching `id` as `stage: "<id>"`, never the display name).
 
 ## 2. Map
 
