@@ -5,7 +5,11 @@ import { createMatch, stepMatch } from "../../src/engine/match";
 import { attackFor, boxesOverlap, HURTBOXES, hurtbox, normalizeAttack } from "../../src/engine/combat";
 import type { MatchEvent, MatchState } from "../../src/engine/types";
 import { NORMALS } from "../../src/moves";
-import { mySettings } from "../../src/settings";
+import { testSettings } from "../fixtures/settings";
+
+// Engine tests use their own frozen copies of the kid files moves.ts and
+// settings.ts (see tests/fixtures/), so a kid's edits there can't fail them.
+vi.mock("../../src/moves", () => import("../fixtures/moves"));
 
 type FighterOpts = { power?: number; height?: number; normals?: Record<string, unknown> };
 
@@ -18,7 +22,7 @@ function fighter(over: FighterOpts = {}): Fighter {
 
 /** A match past the intro, with P1 at x1 and P2 at x2 (P1 on the left, facing right). */
 function newMatch(x1: number, x2: number, a: FighterOpts = {}, b: FighterOpts = {}): MatchState {
-  const s = createMatch({ p1: fighter(a), p2: fighter(b), settings: mySettings, seed: 1 });
+  const s = createMatch({ p1: fighter(a), p2: fighter(b), settings: testSettings, seed: 1 });
   for (let i = 0; i < 90; i++) stepMatch(s, [0, 0]);
   s.fighters[0].x = x1;
   s.fighters[1].x = x2;
@@ -37,31 +41,6 @@ const of = <E extends MatchEvent>(events: E[], type: MatchEvent["type"]): E[] =>
 // P2 stands on the right facing left, so "back" for P2 is RIGHT.
 const P2_BACK = B.RIGHT;
 const P2_DOWN_BACK = B.DOWN | B.RIGHT;
-
-describe("moves table", () => {
-  it("uses the starter frame data", () => {
-    expect(NORMALS["st.LP"]).toMatchObject({ startup: 4, active: 3, recovery: 7, damage: 4, hitstun: 16, blockstun: 8, hitstop: 8 });
-    expect(NORMALS["st.MP"]).toMatchObject({ startup: 6, active: 4, recovery: 12, damage: 8, hitstun: 18, blockstun: 12, hitstop: 10 });
-    expect(NORMALS["st.HP"]).toMatchObject({ startup: 9, active: 4, recovery: 20, damage: 12, hitstun: 22, blockstun: 16, hitstop: 12 });
-    expect(NORMALS["cr.HK"]).toMatchObject({ level: "low", knockdown: true });
-    expect(NORMALS["cr.LK"].level).toBe("low");
-    expect(NORMALS["cr.MK"].level).toBe("low");
-    for (const id of ["j.LP", "j.MP", "j.HP", "j.LK", "j.MK", "j.HK"] as const) expect(NORMALS[id].level).toBe("high");
-    const cancellable = Object.values(NORMALS).filter((a) => a.cancellable).map((a) => a.id).sort();
-    expect(cancellable).toEqual(["cl.HP", "cl.MP", "cr.LK", "cr.LP", "cr.MK", "st.LP"]);
-    for (const a of Object.values(NORMALS)) expect(a.chip).toBe(0);
-  });
-
-  it("kicks reach 20% further than the matching punch", () => {
-    for (const v of ["st", "cr", "j"]) {
-      for (const [p, k] of [["LP", "LK"], ["MP", "MK"], ["HP", "HK"]]) {
-        const punch = NORMALS[`${v}.${p}` as keyof typeof NORMALS].hitbox;
-        const kick = NORMALS[`${v}.${k}` as keyof typeof NORMALS].hitbox;
-        expect(kick.x + kick.w).toBeCloseTo((punch.x + punch.w) * 1.2, 5);
-      }
-    }
-  });
-});
 
 describe("forgiving moves table", () => {
   it("an unknown level becomes mid, with one friendly warning", () => {

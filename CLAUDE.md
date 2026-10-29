@@ -198,6 +198,19 @@ help from a grown-up. Write games so the fun edits are easy and safe to make.
   fall back to a default or show a friendly message, not a blank screen.
 - **Fast feedback.** Edits show up instantly via Vite hot reload with
   `npm run dev -w <game-name>`.
+- **Tests on kid files.** CI runs `npm test` and `npm run typecheck` before
+  publishing images, so a kid's reasonable edit must never turn either red:
+  - Tests that read a kid-editable file (`settings.ts`, move tables, character
+    files, stages, controls, ...) only check things that stay true after
+    reasonable edits: every entry loads or normalizes, animation lengths match
+    their timing, and so on. Never assert the numbers kids are invited to change.
+  - Engine and mechanics tests use their own fixtures (frozen copies of the
+    tables, injected with `vi.mock` or passed in), not the live kid files.
+  - Kid files are typed loosely (`(string & {})` choices, optional fields), so
+    a typo warns at runtime instead of failing typecheck.
+  - The one exception: a test that catches a real gameplay bug a kid's edit
+    would cause (e.g. Flynn Family Fighters' "P1 and P2 share a key" test).
+    Explain it in a comment right next to the setting it checks.
 
 ### README "Make It Your Own" section
 At minimum, include:
@@ -277,6 +290,12 @@ game cabinet. It's a Vite + Phaser app like the games.
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-28 — §7: added "Tests on kid files": tests may only check what stays
+  true after reasonable kid edits; engine tests use fixtures; the one exception
+  (a test for a real gameplay bug, like overlapping P1/P2 keys) is documented
+  next to its setting. (Tests pinning starter numbers made "🛠️ TRY THIS" edits
+  fail CI.)
 
 - 2026-10-28 — Second game: Flynn Family Fighters on port 8002. Added
   `lib/rig` (paper-doll characters drawn from a `Look`) and project skills in

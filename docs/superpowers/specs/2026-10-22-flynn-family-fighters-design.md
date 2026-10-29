@@ -268,9 +268,9 @@ Generic move types, shared by everyone. A fighter picks a type and gives it a na
 ### Example
 ```ts
 // 🥊 COLIN — edit anything here and save to see it change!
-import type { Fighter } from "../fighter";
+import type { FighterFile } from "../fighter";
 
-export const fighter: Fighter = {
+export const fighter: FighterFile = {
   name: "COLIN",
   look: {
     body: "masculine",        // masculine | feminine (the body's frame)
@@ -301,7 +301,7 @@ export const fighter: Fighter = {
 ```
 
 - **Forgiving types** *(my call)*. Choice fields use the "known names or any string" pattern, e.g. `type HairStyle = "swoop" | "buzz" | … | (string & {})`. Editors still autocomplete the known names, but a typo doesn't fail `npm run typecheck`, which would block CI and image publishing for the whole arcade. The runtime fallback handles typos. Tests feed in deliberately bad character files and expect them to be accepted and cleaned up.
-- Types for `Fighter` live in the game.
+- Types for `Fighter` live in the game. Character files are typed with the loose `FighterFile` (every field optional, numbers may be words); the engine only sees the normalized `Fighter`. *(Changed 2026-10-28: typing files as `Fighter` made this very example fail typecheck.)*
 - Types for `Look` live in `lib/rig`, so other games can use a family member's look as-is.
 
 ### Optional drawings

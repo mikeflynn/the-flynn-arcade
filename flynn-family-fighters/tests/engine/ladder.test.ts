@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { arcadeLadder, ladderDifficulty } from "../../src/engine/ladder";
 import { Rng } from "../../src/engine/rng";
-import { MOVE_TYPE_NAMES, normalizeFighter, type Fighter } from "../../src/fighter";
+import { normalizeFighter, type Fighter } from "../../src/fighter";
 
 const make = (id: string): Fighter =>
-  normalizeFighter({ name: id.toUpperCase(), look: {}, specials: [] }, id, [...MOVE_TYPE_NAMES], () => {})!;
+  normalizeFighter({ name: id.toUpperCase(), look: {}, specials: [] }, id, [], () => {})!;
 
 describe("arcadeLadder", () => {
   it("has every other fighter once, and never the player", () => {

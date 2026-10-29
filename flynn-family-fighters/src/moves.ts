@@ -139,8 +139,8 @@ export const NORMALS: Record<NormalId, MoveData> = {
 //   2. Pick a motion and a button.
 //   3. Change the attack numbers. Keep id the same as the new name.
 //   4. Optional: add onFrame code for something new (see "spin-kick").
-//   5. Add the name to MOVE_TYPE_NAMES in src/fighter.ts too (the tests check
-//      they match), then use it in a character file: { type: "rocket", name: "ZOOM" }.
+//   5. Use it in a character file: { type: "rocket", name: "ZOOM" }. That's it:
+//      the game finds every move type in this list by itself.
 
 /** One special move type. */
 export interface MoveTypeDef {

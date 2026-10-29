@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { normalizeFighter } from "../src/fighter";
-import { MOVE_TYPE_NAMES } from "../src/roster";
-import * as colin from "../src/characters/colin";
-import * as ryan from "../src/characters/ryan";
 
 const known = ["fireball"];
 
@@ -65,13 +62,23 @@ describe("normalizeFighter", () => {
     expect(warnings).toHaveLength(1);
   });
 
-  it("accepts the real character files without warnings", () => {
-    for (const [id, mod] of [["colin", colin], ["ryan", ryan]] as const) {
-      const warnings: string[] = [];
-      const f = normalizeFighter(mod.fighter, id, MOVE_TYPE_NAMES, (m) => warnings.push(m));
-      expect(f).not.toBeNull();
-      expect(warnings).toEqual([]);
-      expect(f!.specials).toHaveLength(2);
-    }
+  it("warns about a word where a stat number goes, and uses the default", () => {
+    const warnings: string[] = [];
+    const f = normalizeFighter({ stats: { speed: "fast" } }, "z", known, (m) => warnings.push(m))!;
+    expect(f.stats.speed).toBe(5);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/speed.*"fast"/);
+  });
+});
+
+// The character files are kid files: kids add, delete and change them. This
+// only checks what must stay true after any edit: each one becomes a fighter.
+// (Warnings are fine: they're how the game explains a typo.)
+const characterFiles = import.meta.glob<{ fighter?: unknown }>("../src/characters/*.ts", { eager: true });
+
+describe("the character files", () => {
+  it.each(Object.entries(characterFiles))("%s becomes a fighter", (path, mod) => {
+    const id = path.split("/").pop()!.replace(/\.ts$/, "");
+    expect(normalizeFighter(mod.fighter, id, undefined, () => {})).not.toBeNull();
   });
 });

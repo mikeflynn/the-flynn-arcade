@@ -49,8 +49,8 @@ Every fighter has 2 to 4 special moves. You do them by drawing a shape with the 
 | **qcf** ("quarter circle forward") | ↓ ↘ → | a punch (fireball) | Throws a fireball |
 | **qcb** ("quarter circle back") | ↓ ↙ ← | a kick (spin-kick) | Spin through the air, hitting up to 3 times |
 | **dp** ("dragon punch") | → ↓ ↘ | a punch (uppercut) | Leap up, can't be hit at the start |
-| **chargeBF** | hold ← for about 1 second, then → | a punch (charge-dash) | Fast dash forward |
-| **chargeDU** | hold ↓ for about 1 second, then ↑ | a kick (flip-kick) | Flip kick up and over |
+| **chargeBF** | hold ← for ¾ of a second (45 frames), then → | a punch (charge-dash) | Fast dash forward |
+| **chargeDU** | hold ↓ for ¾ of a second (45 frames), then ↑ | a kick (flip-kick) | Flip kick up and over |
 | **mash** | tap a punch 5 times fast | (just the punch) | A flurry of tiny punches |
 | **360** | spin the stick all the way around | a punch (command-throw) | A big, unblockable grab |
 
@@ -179,7 +179,7 @@ You can replace any body part the same way. The part names are: `head`, `headHit
 
 ### 6. Challenges
 
-- **A new special-move type.** Copy a block in `MOVE_TYPES` in [`src/moves.ts`](src/moves.ts) (say `"charge-dash"`), call it `"rocket"`, and change the numbers. Then add `"rocket"` to `MOVE_TYPE_NAMES` in [`src/fighter.ts`](src/fighter.ts) (the tests check they match) and give it to a fighter. Hint: look for the `🛠️ TRY THIS` comments in `moves.ts`.
+- **A new special-move type.** Copy a block in `MOVE_TYPES` in [`src/moves.ts`](src/moves.ts) (say `"charge-dash"`), call it `"rocket"`, and change the numbers. Then give it to a fighter: `{ type: "rocket", name: "ZOOM" }`. The game finds every move type in `MOVE_TYPES` by itself. Hint: look for the `🛠️ TRY THIS` comments in `moves.ts`.
 - **A new animation, just by editing angles.** Open [`src/animations.ts`](src/animations.ts) and change the angles in a punch's poses (negative swings forward, positive swings back). Open `?viewer` and press N to watch it. Can you make a kick that goes straight up?
 - **Faster and faster.** Can you make the fight speed up as the timer runs down? Hint: look at how `gameSpeed` is used in `src/scenes/FightScene.ts`.
 - **A stage you love.** Can you make the sunset a rainy night? Hint: the sky colors in `stages.ts`.
@@ -210,7 +210,7 @@ Music (in `public/assets/music/`): `title`, `select`, `fight`.
 - Undo one file: `git checkout -- flynn-family-fighters/src/settings.ts` (use the path of the file you changed).
 - Undo everything you changed in the game: `git checkout -- flynn-family-fighters`.
 - Made a brand-new file that's causing trouble (like a fighter)? Delete it and the game forgets it ever existed.
-- The default numbers are right in the table in "Easy tweaks" above: `roundTime` 99, `roundsToWin` 2, `gameSpeed` 1, `cpuDifficulty` 3, `damageScale` 1, `chipDamageFraction` 0.25, `dizzyEnabled` true, `throwTechEnabled` false, `motionWindowFrames` 20, `showHitboxes` false, `animationFps` 20.
+- The starting values for `settings.ts` are: `roundTime` 99, `roundsToWin` 2, `gameSpeed` 1, `cpuDifficulty` 3, `damageScale` 1, `chipDamageFraction` 0.25, `dizzyEnabled` true, `throwTechEnabled` false, `motionWindowFrames` 20, `showHitboxes` false, `animationFps` 20.
 - Run `npm test` to find out *why* something's wrong: it tells you in plain words.
 
 ---

@@ -1,11 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { normalizeFighter, type Fighter } from "../../src/fighter";
 import { B, type InputFrame } from "../../src/engine/input";
 import { createMatch, stepMatch } from "../../src/engine/match";
 import { pushWidth } from "../../src/engine/movement";
 import { Rng } from "../../src/engine/rng";
 import type { MatchState } from "../../src/engine/types";
-import { mySettings } from "../../src/settings";
+import { testSettings } from "../fixtures/settings";
+
+// Engine tests use their own frozen copies of the kid files moves.ts and
+// settings.ts (see tests/fixtures/), so a kid's edits there can't fail them.
+vi.mock("../../src/moves", () => import("../fixtures/moves"));
 
 function fighter(over: { speed?: number; jump?: number; height?: number } = {}): Fighter {
   return normalizeFighter(
@@ -15,7 +19,7 @@ function fighter(over: { speed?: number; jump?: number; height?: number } = {}):
 }
 
 function newMatch(a: Parameters<typeof fighter>[0] = {}, b: Parameters<typeof fighter>[0] = {}, seed = 1): MatchState {
-  const s = createMatch({ p1: fighter(a), p2: fighter(b), settings: mySettings, seed });
+  const s = createMatch({ p1: fighter(a), p2: fighter(b), settings: testSettings, seed });
   for (let i = 0; i < 90; i++) stepMatch(s, [0, 0]); // skip the intro
   return s;
 }
@@ -26,7 +30,7 @@ function run(s: MatchState, n: number, p1: InputFrame = 0, p2: InputFrame = 0): 
 
 describe("intro", () => {
   it("lasts 90 frames, calls round then fight, and ignores input", () => {
-    const s = createMatch({ p1: fighter(), p2: fighter(), settings: mySettings, seed: 1 });
+    const s = createMatch({ p1: fighter(), p2: fighter(), settings: testSettings, seed: 1 });
     const types: string[] = [];
     for (let i = 0; i < 90; i++) {
       expect(s.phase).toBe("intro");

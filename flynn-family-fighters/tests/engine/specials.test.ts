@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MOVE_TYPE_NAMES, normalizeFighter, type Fighter } from "../../src/fighter";
+import { normalizeFighter, type Fighter } from "../../src/fighter";
 import { B, type InputFrame } from "../../src/engine/input";
 import { createMatch, stepMatch } from "../../src/engine/match";
 import { trySpecial } from "../../src/engine/specials";
 import type { MatchEvent, MatchState } from "../../src/engine/types";
 import { KNOWN_MOVE_TYPES, MOVE_TYPES, type MoveTypeDef } from "../../src/moves";
-import { mySettings } from "../../src/settings";
+import { testSettings } from "../fixtures/settings";
+
+// Engine tests use their own frozen copies of the kid files moves.ts and
+// settings.ts (see tests/fixtures/), so a kid's edits there can't fail them.
+vi.mock("../../src/moves", () => import("../fixtures/moves"));
 
 type Opts = { specials?: unknown[]; height?: number; jump?: number; known?: string[] };
 
@@ -19,13 +23,13 @@ const ALL = [
 function fighter(o: Opts = {}): Fighter {
   return normalizeFighter(
     { name: "T", look: { height: o.height ?? 1 }, stats: { power: 5, jump: o.jump ?? 5 }, specials: o.specials ?? ALL },
-    "t", o.known ?? [...MOVE_TYPE_NAMES], () => {},
+    "t", o.known ?? KNOWN_MOVE_TYPES, () => {},
   )!;
 }
 
 /** A match past the intro, with P1 at x1 and P2 at x2 (P1 on the left, facing right). */
 function newMatch(x1: number, x2: number, a: Opts = {}, b: Opts = {}): MatchState {
-  const s = createMatch({ p1: fighter(a), p2: fighter(b), settings: mySettings, seed: 1 });
+  const s = createMatch({ p1: fighter(a), p2: fighter(b), settings: testSettings, seed: 1 });
   for (let i = 0; i < 90; i++) stepMatch(s, [0, 0]);
   s.fighters[0].x = x1;
   s.fighters[1].x = x2;
@@ -61,12 +65,6 @@ const P2_QCF = [B.DOWN, B.DOWN | B.LEFT, B.LEFT];
 const PUNCHES = [B.LP, B.MP, B.HP];
 /** qcf + a punch for P1, on steps 0, 1, 2. */
 const p1Fireball = (punch: number = B.LP) => script(P1_QCF[0], P1_QCF[1], P1_QCF[2] | punch);
-
-describe("move types", () => {
-  it("KNOWN_MOVE_TYPES are the move types the character files may use", () => {
-    expect(KNOWN_MOVE_TYPES).toEqual([...MOVE_TYPE_NAMES]);
-  });
-});
 
 describe("fireball", () => {
   it("qcf + LP throws a projectile on frame 12 that travels 4 px a frame and hits for 10", () => {
@@ -352,13 +350,13 @@ describe("forgiving", () => {
   }
 
   it("trySpecial starts a known special from this exact setup (so the tests below can fail)", () => {
-    const s = qcfJustEntered([{ type: "fireball", name: "BLAST" }], [...MOVE_TYPE_NAMES]);
+    const s = qcfJustEntered([{ type: "fireball", name: "BLAST" }], KNOWN_MOVE_TYPES);
     expect(trySpecial(s, 0)).toMatchObject([{ type: "special", name: "BLAST" }]);
   });
 
   for (const type of ["laser", "constructor", "toString"]) {
     it(`trySpecial ignores a special whose type isn't a move type ("${type}")`, () => {
-      const s = qcfJustEntered([{ type, name: "ZAP" }], [...MOVE_TYPE_NAMES, type]);
+      const s = qcfJustEntered([{ type, name: "ZAP" }], [...KNOWN_MOVE_TYPES, type]);
       expect(s.fighters[0].fighter.specials).toMatchObject([{ type }]);
       expect(s.fighters[0].attack).toBeNull();
       expect(trySpecial(s, 0)).toBeNull();

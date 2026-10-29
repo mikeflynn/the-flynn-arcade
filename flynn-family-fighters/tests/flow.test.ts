@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { afterMatch, gridLayout, type FlowState } from "../src/flow";
-import { MOVE_TYPE_NAMES, normalizeFighter, type Fighter } from "../src/fighter";
+import { normalizeFighter, type Fighter } from "../src/fighter";
 
 const make = (id: string): Fighter =>
-  normalizeFighter({ name: id.toUpperCase(), look: {}, specials: [] }, id, [...MOVE_TYPE_NAMES], () => {})!;
+  normalizeFighter({ name: id.toUpperCase(), look: {}, specials: [] }, id, [], () => {})!;
 
 const arcade = (ladderIndex: number): FlowState => ({
   mode: "arcade",

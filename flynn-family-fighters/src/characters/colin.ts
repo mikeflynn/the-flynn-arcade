@@ -1,9 +1,8 @@
 // 🥊 COLIN — edit anything here and save to see it change!
 // (Open http://localhost:8002/?viewer to see your fighter up close.)
-import type { Fighter } from "../fighter";
+import type { FighterFile } from "../fighter";
 
-export const fighter: Fighter = {
-  id: "colin", // the file's name; the game fills this in for you
+export const fighter: FighterFile = {
   name: "COLIN",
   look: {
     body: "masculine",        // masculine | feminine (the body's frame)

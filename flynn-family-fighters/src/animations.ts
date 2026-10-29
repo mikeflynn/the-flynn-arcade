@@ -22,7 +22,7 @@
 
 import { animLength, flatFeet, STANCE as RIG_STANCE, type Animation, type Keyframe, type Pose } from "@web-games/rig";
 import type { FighterState } from "./engine/types";
-import { MOVE_TYPES, NORMALS } from "./moves";
+import { MOVE_TYPES, NORMALS, type MoveTypeDef } from "./moves";
 
 // ─── POSES ──────────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ const LYING: Pose = {
 // ─── HOW ATTACKS ARE BUILT ──────────────────────────────────────────────────
 
 /** An attack's three timing numbers from moves.ts. */
-interface Timing { startup: number; active: number; recovery: number }
+export interface Timing { startup: number; active: number; recovery: number }
 
 /** The same safe frame counts the fight engine uses: whole numbers, never negative (active is at least 1). */
 function timing(a: Timing): Timing {
@@ -233,8 +233,29 @@ const NORMAL_ANIMS: Record<keyof typeof NORMALS, Animation> = {
 
 // ─── SPECIAL MOVES (one per move type in moves.ts) ──────────────────────────
 
-/** A move type's timing. Strength doesn't change any move's timing, so medium (1) stands for all three. */
-const special = (type: string): Timing => timing(MOVE_TYPES[type]!.attack(1, { type, name: type }));
+/** The timing a move type gets if its attack code in moves.ts has a problem, so the game still starts. */
+export const FALLBACK_TIMING: Timing = { startup: 4, active: 4, recovery: 10 };
+
+/**
+ * A move type's timing. Strength doesn't change any move's timing, so medium (1)
+ * stands for all three. This runs kid code from moves.ts while the game loads,
+ * so a move whose attack throws (or isn't a function) gets FALLBACK_TIMING and
+ * a message instead of a blank screen. (The fight skips that move, too.)
+ */
+export function specialTiming(
+  type: string,
+  def: MoveTypeDef | undefined = Object.hasOwn(MOVE_TYPES, type) ? MOVE_TYPES[type] : undefined,
+  warn: (message: string) => void = console.warn,
+): Timing {
+  try {
+    if (typeof def?.attack !== "function") throw new Error("attack should be code like (strength, choice) => ({ ... })");
+    return timing(def.attack(1, { type, name: type }));
+  } catch (err) {
+    warn(`🥊 moves.ts ${type}: its attack has a problem (${String(err)}). Its animation uses a simple timing for now.`);
+    return { ...FALLBACK_TIMING };
+  }
+}
+const special = (type: string): Timing => specialTiming(type);
 
 /** Landing from a rising special: knees bent, snapping in at once. */
 const LANDING = pose(SQUAT);

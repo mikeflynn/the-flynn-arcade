@@ -18,7 +18,7 @@ Talk in a warm, playful, kid-friendly voice. Keep questions short.
   - `lib/rig/src/look.ts`: `BODY_FRAMES`, `ARCHETYPES`, `BUILDS`, `HAIR_STYLES`, `JAWS`, `BROWS`, `EYE_SHAPES`, `NOSES`, `EXTRAS`, `WEAPONS`, `LOOK_LIMITS`
   - `flynn-family-fighters/src/moves.ts`: `MOVE_TYPES` (and its "add your own" guide)
   - `flynn-family-fighters/src/stages.ts`: `STAGES`
-  - `flynn-family-fighters/src/fighter.ts`: `STAT_LIMITS`, `SPECIAL_LIMITS`, `MAX_SPECIALS`, `MOVE_TYPE_NAMES`
+  - `flynn-family-fighters/src/fighter.ts`: `FighterFile`, `STAT_LIMITS`, `SPECIAL_LIMITS`, `MAX_SPECIALS`
   - every file in `flynn-family-fighters/src/characters/` (the format, the comments, the roster stats)
 - **Privacy.** The file holds only: a first name, the look, stats, specials, a
   win quote and a home stage. Never photos, ages, last names, schools or
@@ -46,7 +46,7 @@ Ask in this order, one question each:
 - Moves: match the description to a `MOVE_TYPES` entry (a thrown thing is a `fireball`, a rising punch an `uppercut`, and so on). Give each its own `name`; optional `color`, `speed`, `damageBonus` stay inside `SPECIAL_LIMITS`. At most `MAX_SPECIALS`.
 - **If something isn't in the library** (a lacrosse stick, a braid style, a new kind of move), add it, don't fake it:
   - **New part:** add the name to its list in `look.ts`, add its drawing code in `lib/rig/src/parts/` (follow the neighbouring entries in `hair.ts`, `head.ts`, `body.ts`, `hands.ts` or `weapons.ts`), and add tests following the existing ones in `lib/rig/tests/`.
-  - **New move type:** add a block to `MOVE_TYPES` in `moves.ts` following its guide, add its name to `MOVE_TYPE_NAMES` in `fighter.ts` (a test asserts they match), and add tests.
+  - **New move type:** add a block to `MOVE_TYPES` in `moves.ts` following its guide (the game finds it by itself), and run the tests. If it uses new engine code (like an `onFrame`), copy the block into the frozen test copy `flynn-family-fighters/tests/fixtures/moves.ts` and test it in `tests/engine/specials.test.ts`. Never assert numbers read from `moves.ts` itself (CLAUDE.md §7, "Tests on kid files").
   - Do this in the same change, and run the tests. Keep kid files forgiving: unknown values must warn, never fail `typecheck`.
 
 ## 3. Keep it fair
@@ -62,8 +62,8 @@ of the average total, each inside `STAT_LIMITS`. Health stays near the average
 
 Create `flynn-family-fighters/src/characters/<lowercase-first-name>.ts`
 (kebab-case if needed). Copy the structure and the friendly comments of
-`colin.ts` / `ryan.ts` exactly: header comment, `import type { Fighter }`,
-`export const fighter: Fighter`, per-field comments listing the options, a
+`colin.ts` / `ryan.ts` exactly: header comment, `import type { FighterFile }`,
+`export const fighter: FighterFile` (no `id` line: the file name is the id), per-field comments listing the options, a
 `// 🛠️ TRY THIS:` hint or two. Do not import Phaser. Use NAME in capitals.
 
 ## 5. Check and show

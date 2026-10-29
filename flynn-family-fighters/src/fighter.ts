@@ -3,15 +3,12 @@
 // message in the console (press F12) and a safe fallback.
 
 import { clampSettings, type Limits } from "@web-games/settings";
-import { normalizeLook, type Look } from "@web-games/rig";
+import { normalizeLook, type Look, type LookFile } from "@web-games/rig";
+import { KNOWN_MOVE_TYPES } from "./moves";
 
 export type MoveType =
   | "fireball" | "uppercut" | "spin-kick" | "charge-dash" | "flip-kick" | "rapid-hits" | "command-throw"
   | (string & {});
-
-export const MOVE_TYPE_NAMES = [
-  "fireball", "uppercut", "spin-kick", "charge-dash", "flip-kick", "rapid-hits", "command-throw",
-] as const;
 
 export interface SpecialChoice {
   type: MoveType;
@@ -36,6 +33,34 @@ export const NORMAL_IDS: readonly NormalId[] = [
   "cl.MP", "cl.HP",
 ];
 
+/** A number in a character file. A word like "fast" still typechecks: the game warns and uses a default. */
+type LooseNumber = number | (string & {});
+
+/**
+ * What a character file in src/characters/ writes. Everything is optional and
+ * forgiving: a typo, a missing field or a word where a number goes still
+ * typechecks, and normalizeFighter() fixes it (with a message in the console).
+ * The game itself only ever sees the cleaned-up `Fighter` below.
+ */
+export interface FighterFile {
+  /** Ignored: a fighter's id is always its file's name. */
+  id?: string;
+  name?: string;
+  look?: LookFile;
+  stats?: { speed?: LooseNumber; power?: LooseNumber; health?: LooseNumber; jump?: LooseNumber };
+  specials?: {
+    type: MoveType;
+    name?: string;
+    color?: string;
+    speed?: LooseNumber;
+    damageBonus?: LooseNumber;
+  }[];
+  normals?: { [id in NormalId | (string & {})]?: { damage?: LooseNumber; reach?: LooseNumber } };
+  winQuote?: string;
+  stage?: string;
+}
+
+/** A complete, safe fighter: what normalizeFighter() makes from a character file. */
 export interface Fighter {
   id: string;
   name: string;
@@ -78,7 +103,7 @@ function tweak(
 export function normalizeFighter(
   raw: unknown,
   fileId: string,
-  knownMoveTypes: readonly string[],
+  knownMoveTypes: readonly string[] = KNOWN_MOVE_TYPES,
   warn: (message: string) => void = console.warn,
 ): Fighter | null {
   if (!isObj(raw)) {
@@ -90,13 +115,21 @@ export function normalizeFighter(
   if (raw.name !== undefined && name !== raw.name) warn(`🥊 ${fileId}.ts: name should be some text, like "COLIN". Using ${name}.`);
 
   const statsSrc = isObj(raw.stats) ? raw.stats : {};
-  const num = (v: unknown, fallback: number) => (typeof v === "number" ? v : fallback);
+  const num = (key: keyof Fighter["stats"], fallback: number) => {
+    const v = statsSrc[key];
+    if (typeof v === "number") return v;
+    if (v !== undefined) {
+      const { min, max } = STAT_LIMITS[key];
+      warn(`🥊 ${name}: stats.${key} should be a number from ${min} to ${max}, not ${JSON.stringify(v)}. Using ${fallback}.`);
+    }
+    return fallback;
+  };
   const stats = clampSettings(
     {
-      speed: num(statsSrc.speed, 5),
-      power: num(statsSrc.power, 5),
-      health: num(statsSrc.health, 100),
-      jump: num(statsSrc.jump, 5),
+      speed: num("speed", 5),
+      power: num("power", 5),
+      health: num("health", 100),
+      jump: num("jump", 5),
     },
     STAT_LIMITS,
     (m) => warn(`${name}: ${m}`),

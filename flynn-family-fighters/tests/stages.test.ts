@@ -5,9 +5,8 @@ import { DEFAULT_STAGE, normalizeStage, STAGES } from "../src/stages";
 // check things that stay true after those edits.
 
 describe("STAGES", () => {
-  it("still has the four starter stages (kids can add more)", () => {
-    const ids = STAGES.map((s) => s.id);
-    for (const id of ["track", "schoolyard", "ballfield", "backyard"]) expect(ids).toContain(id);
+  it("has at least one stage to fight on (kids can add, change and remove them)", () => {
+    expect(STAGES.length).toBeGreaterThan(0);
   });
 });
 

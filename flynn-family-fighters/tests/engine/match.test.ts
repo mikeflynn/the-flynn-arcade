@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { normalizeFighter } from "../../src/fighter";
 import { B, type InputFrame } from "../../src/engine/input";
 import { createMatch, matchWinner, stepMatch } from "../../src/engine/match";
 import type { FState, MatchEvent, MatchState } from "../../src/engine/types";
-import { mySettings, type Settings } from "../../src/settings";
+import type { Settings } from "../../src/settings";
+import { testSettings } from "../fixtures/settings";
+
+// Engine tests use their own frozen copies of the kid files moves.ts and
+// settings.ts (see tests/fixtures/), so a kid's edits there can't fail them.
+vi.mock("../../src/moves", () => import("../fixtures/moves"));
 
 function fighter(height = 1) {
   return normalizeFighter({ name: "T", look: { height }, stats: { power: 5 } }, "t", [], () => {})!;
@@ -11,7 +16,7 @@ function fighter(height = 1) {
 
 /** A match past the intro, with P1 at x1 and P2 at x2 (P1 on the left, facing right). */
 function newMatch(x1 = 400, x2 = 480, settings: Partial<Settings> = {}, height = 1): MatchState {
-  const s = createMatch({ p1: fighter(height), p2: fighter(height), settings: { ...mySettings, ...settings }, seed: 1 });
+  const s = createMatch({ p1: fighter(height), p2: fighter(height), settings: { ...testSettings, ...settings }, seed: 1 });
   for (let i = 0; i < 90; i++) stepMatch(s, [0, 0]);
   s.fighters[0].x = x1;
   s.fighters[1].x = x2;
@@ -386,7 +391,7 @@ describe("KO and rounds", () => {
     }
     expect([s.fighters[0].x, s.fighters[1].x]).toEqual([300, 660]);
     expect([s.fighters[0].facing, s.fighters[1].facing]).toEqual([1, -1]);
-    expect(s.timerFrames).toBe(mySettings.roundTime * 60);
+    expect(s.timerFrames).toBe(testSettings.roundTime * 60);
     expect(s.roundWinner).toBeNull();
     // ...and the round plays.
     run(s, 90);
@@ -423,7 +428,7 @@ describe("KO and rounds", () => {
 
 describe("the timer", () => {
   it("counts down during the fight only", () => {
-    const s = createMatch({ p1: fighter(), p2: fighter(), settings: mySettings, seed: 1 });
+    const s = createMatch({ p1: fighter(), p2: fighter(), settings: testSettings, seed: 1 });
     for (let i = 0; i < 90; i++) stepMatch(s, [0, 0]);
     expect(s.timerFrames).toBe(99 * 60);
     run(s, 10);

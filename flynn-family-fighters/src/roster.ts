@@ -1,9 +1,8 @@
 // Finds every fighter in src/characters/ and cleans each one up.
 // Drop in a new file and it shows up: there's no list to edit.
 
-import { MOVE_TYPE_NAMES, normalizeFighter, type Fighter } from "./fighter";
-
-export { MOVE_TYPE_NAMES };
+import { normalizeFighter, type Fighter } from "./fighter";
+import { KNOWN_MOVE_TYPES } from "./moves";
 
 export interface RosterResult {
   fighters: Fighter[];
@@ -14,7 +13,7 @@ export interface RosterResult {
 type Entry = [path: string, load: () => Promise<{ fighter?: unknown }>];
 
 /** Loads every entry on its own, so one broken file never takes down the rest. */
-export async function collectRoster(entries: Entry[], knownMoveTypes: readonly string[]): Promise<RosterResult> {
+export async function collectRoster(entries: Entry[], knownMoveTypes: readonly string[] = KNOWN_MOVE_TYPES): Promise<RosterResult> {
   const fighters: Fighter[] = [];
   const problems: string[] = [];
   const settled = await Promise.allSettled(entries.map(([, load]) => load()));
@@ -49,7 +48,7 @@ export async function collectRoster(entries: Entry[], knownMoveTypes: readonly s
 }
 
 /** Lazy, so a file with a typo only costs that one fighter. */
-export function loadRoster(knownMoveTypes: readonly string[] = MOVE_TYPE_NAMES): Promise<RosterResult> {
+export function loadRoster(knownMoveTypes: readonly string[] = KNOWN_MOVE_TYPES): Promise<RosterResult> {
   const files = import.meta.glob("./characters/*.ts") as Record<string, () => Promise<{ fighter?: unknown }>>;
   return collectRoster(Object.entries(files), knownMoveTypes);
 }

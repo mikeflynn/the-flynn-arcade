@@ -17,7 +17,8 @@
 //
 // 🛠️ TRY THIS: swap your punches and kicks around until they feel right!
 // (Keep player 1's and player 2's keys different: only "start" and "mute" may
-// share a key. If both players get the same key, `npm test` will tell you.)
+// share a key, and every button needs at least one key for each player. Break
+// either rule and `npm test` will tell you, because the game wouldn't work right.)
 
 import type { Bindings, InputManager, PadBindings } from "@web-games/input";
 import { B, type InputFrame } from "./engine/input";

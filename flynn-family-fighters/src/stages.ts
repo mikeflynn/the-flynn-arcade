@@ -22,6 +22,7 @@
 
 export type PropName = "palms" | "bleachers" | "crowd" | "fence" | "backstop" | "house" | "swings";
 
+/** A complete, safe stage: what normalizeStage() makes from a block in STAGES. */
 export interface StageDef {
   /** A short name with no spaces, used in character files (stage: "track"). */
   id: string;
@@ -39,7 +40,22 @@ export interface StageDef {
   props: (PropName | (string & {}))[];
 }
 
-export const STAGES: StageDef[] = [
+/**
+ * What a stage block below may write. Every field is optional, and
+ * a typo still typechecks: the game fills in or fixes anything wrong (with a
+ * message in the console) and only ever uses the complete StageDef above.
+ */
+export interface StageFile {
+  id?: string;
+  name?: string;
+  sky?: string[];
+  mountains?: string[];
+  floor?: string;
+  floorLines?: string;
+  props?: (PropName | (string & {}))[] | PropName | (string & {});
+}
+
+export const STAGES: StageFile[] = [
   // The running track at sunset, with the crowd in the bleachers.
   // The first stage is the one used when a fighter has no home stage.
   {

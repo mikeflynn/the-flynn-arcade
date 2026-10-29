@@ -1,22 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CpuBrain } from "../../src/engine/cpu";
 import { B, type InputFrame } from "../../src/engine/input";
 import { createMatch, stepMatch } from "../../src/engine/match";
 import { Rng } from "../../src/engine/rng";
 import type { MatchState } from "../../src/engine/types";
-import { MOVE_TYPE_NAMES, normalizeFighter, type Fighter } from "../../src/fighter";
-import { mySettings } from "../../src/settings";
+import { normalizeFighter, type Fighter } from "../../src/fighter";
+import { KNOWN_MOVE_TYPES } from "../../src/moves";
+import { testSettings } from "../fixtures/settings";
+
+// Engine tests use their own frozen copies of the kid files moves.ts and
+// settings.ts (see tests/fixtures/), so a kid's edits there can't fail them.
+vi.mock("../../src/moves", () => import("../fixtures/moves"));
 
 const ALL_BITS = Object.values(B).reduce((a, b) => a | b, 0);
 
 function fighter(specials: unknown[]): Fighter {
-  return normalizeFighter({ name: "T", look: {}, specials }, "t", [...MOVE_TYPE_NAMES], () => {})!;
+  return normalizeFighter({ name: "T", look: {}, specials }, "t", KNOWN_MOVE_TYPES, () => {})!;
 }
 const WITH_FIREBALL = fighter([{ type: "fireball", name: "BLAST" }, { type: "uppercut", name: "RISER" }]);
 const PLAIN = fighter([]);
 
 function fightMatch(p1: Fighter, p2: Fighter, seed = 1): MatchState {
-  const s = createMatch({ p1, p2, settings: mySettings, seed });
+  const s = createMatch({ p1, p2, settings: testSettings, seed });
   for (let i = 0; i < 90; i++) stepMatch(s, [0, 0]);
   return s;
 }
