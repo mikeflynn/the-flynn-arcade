@@ -4,5 +4,6 @@
  */
 export * from "./assets";
 export * from "./audio";
+export * from "./htmlAudio";
 export * from "./phaserAudio";
 export * from "./phaserLoad";

@@ -1,15 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { clampSettings } from "@web-games/settings";
-import { parseFrames } from "@web-games/pixel-art";
 import type { GameInfo } from "@web-games/arcade";
 import { mySettings } from "../src/settings";
 import { settingLimits } from "../src/limits";
-import { cabinetArt } from "../src/cabinet";
-import { cabinetPalette, findRegion, shade } from "../src/layout";
 import { buildSlots, initialIndex, nextAttractIndex, wrap } from "../src/selection";
 import { loadArcadeSettings, saveArcadeSettings, type StorageLike } from "../src/storage";
 import { collectRegistrations, folderOf, loadGames } from "../src/games";
-import { playerBadges } from "../src/badges";
+import { playerLabel } from "../src/badges";
+import { safeColor } from "../src/colors";
+import { tickerLine } from "../src/ticker";
+import { logoLines, settings, tickerBottom, tickerTop } from "../src/settings";
 
 const game = (id: string): GameInfo => ({
   id,
@@ -21,35 +20,45 @@ const game = (id: string): GameInfo => ({
 });
 
 describe("settings.ts", () => {
-  it("ships with every value in its safe range, and a limit for each", () => {
-    const warn = vi.fn();
-    clampSettings(mySettings, settingLimits, warn);
-    expect(warn).not.toHaveBeenCalled();
-    expect(Object.keys(settingLimits).sort()).toEqual(Object.keys(mySettings).sort());
+  // Only shape checks here: kids are invited to change these values (CLAUDE.md §7).
+  it("has a safe range for every number, and every number stays inside it", () => {
+    const numbers = Object.entries(mySettings).filter(([, v]) => typeof v === "number").map(([k]) => k);
+    expect(Object.keys(settingLimits).sort()).toEqual(numbers.sort());
+    for (const [key, range] of Object.entries(settingLimits)) {
+      const value = settings[key as keyof typeof settings] as number;
+      expect(value).toBeGreaterThanOrEqual(range.min);
+      expect(value).toBeLessThanOrEqual(range.max);
+    }
+  });
+
+  it("has words for the logo and both tickers", () => {
+    for (const list of [logoLines, tickerTop, tickerBottom]) {
+      expect(Array.isArray(list)).toBe(true);
+      expect(list.every((s) => typeof s === "string")).toBe(true);
+    }
   });
 });
 
-describe("cabinet art", () => {
-  it("is clean with a game's colors", () => {
-    expect(parseFrames([cabinetArt], cabinetPalette("#5ab0f0", "#f6d860"), "cabinet").warnings).toEqual([]);
+describe("colors", () => {
+  it("keeps a good #rrggbb color", () => {
+    expect(safeColor("#AbCdEf", "#000000")).toBe("#AbCdEf");
   });
-
-  it("has a screen big enough for a 32 x 24 picture, and a marquee", () => {
-    const screen = findRegion(cabinetArt, "G");
-    expect(screen && screen.width >= 32 && screen.height >= 24).toBe(true);
-    expect(findRegion(cabinetArt, "M")).not.toBeNull();
+  it("falls back when a color isn't a #rrggbb code", () => {
+    expect(safeColor("red", "#18171b")).toBe("#18171b");
+    expect(safeColor(undefined, "#18171b")).toBe("#18171b");
+    expect(safeColor("#fff", "#18171b")).toBe("#18171b");
   });
 });
 
-describe("layout helpers", () => {
-  it("findRegion boxes in a letter", () => {
-    expect(findRegion(["....", ".GG.", ".GG."], "G")).toEqual({ x: 1, y: 1, width: 2, height: 2 });
-    expect(findRegion(["...."], "G")).toBeNull();
+describe("ticker", () => {
+  it("joins the messages with stars and fills in the game count", () => {
+    expect(tickerLine(["INSERT COIN", "{games} ON THE FLOOR"], 2)).toBe("INSERT COIN ✦ 2 GAMES ON THE FLOOR ✦ ");
   });
-
-  it("shade makes colors darker", () => {
-    expect(shade("#ffffff", 0.5)).toBe("#808080");
-    expect(shade("#ff0000", 0)).toBe("#ff0000");
+  it("says GAME for just one", () => {
+    expect(tickerLine(["{games} ON THE FLOOR"], 1)).toBe("1 GAME ON THE FLOOR ✦ ");
+  });
+  it("is empty with no messages", () => {
+    expect(tickerLine([], 3)).toBe("");
   });
 });
 
@@ -141,9 +150,10 @@ describe("games.ts", () => {
   });
 });
 
-describe("player badges", () => {
-  it("shows the player count, and CO-OP when players team up", () => {
-    expect(playerBadges({ min: 1, max: 1, coop: false }).map((b) => b.text)).toEqual(["1P"]);
-    expect(playerBadges({ min: 1, max: 2, coop: true }).map((b) => b.text)).toEqual(["1-2P", "CO-OP"]);
+describe("player label", () => {
+  it("shows the player count, and CO-OP or VS for two players", () => {
+    expect(playerLabel({ min: 1, max: 2, coop: true })).toBe("1–2P CO-OP");
+    expect(playerLabel({ min: 1, max: 2, coop: false })).toBe("1–2P VS");
+    expect(playerLabel({ min: 1, max: 1, coop: false })).toBe("1P");
   });
 });
