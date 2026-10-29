@@ -20,6 +20,8 @@ export async function loadPixelFont(): Promise<void> {
     const loaded = face.load().then((f) => {
       document.fonts.add(f);
     });
+    // If the font fails after the wait below is over, nobody is awaiting it any more: catch it here so it isn't an unhandled error.
+    loaded.catch(() => {});
     await Promise.race([loaded, new Promise((resolve) => setTimeout(resolve, FONT_WAIT_MS))]);
   } catch {
     console.info("The pixel font didn't load, so the text uses monospace.");

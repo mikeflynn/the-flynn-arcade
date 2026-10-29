@@ -180,7 +180,8 @@ export class FightScene extends Phaser.Scene {
       case "matchOver":
         this.endSteps = 0;
         this.hud.showBanner(this.matchMessage(e.player), MATCH_END_STEPS);
-        if (e.player !== undefined) audio.playSfx("youWin");
+        // The cheer is for a human winning: not for a draw, and not when the computer beat you.
+        if (e.player !== undefined && !this.fight.cpu[e.player]) audio.playSfx("youWin");
         break;
     }
   }
