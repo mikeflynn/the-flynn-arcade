@@ -14,9 +14,7 @@
     "@web-games/arcade": "*",
     "@web-games/audio": "*",
     "@web-games/input": "*",
-    "@web-games/pixel-art": "*",
-    "@web-games/settings": "*",
-    "phaser": "3.90.0"
+    "@web-games/settings": "*"
   },
   "devDependencies": {
     "typescript": "5.9.3",

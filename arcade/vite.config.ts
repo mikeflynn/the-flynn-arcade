@@ -8,6 +8,5 @@ export default defineConfig({
   appType: "mpa",
   server: { port: 8000, strictPort: true },
   preview: { port: 8000, strictPort: true },
-  build: { chunkSizeWarningLimit: 2000 }, // Phaser is one big file, and that's OK
   test: { environment: "node", include: ["tests/**/*.test.ts"], passWithNoTests: true },
 });

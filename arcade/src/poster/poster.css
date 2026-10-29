@@ -1,0 +1,279 @@
+/* The Flynn Arcade poster. Colors come from settings.ts through --bg, --ink and --hi. */
+
+@font-face {
+  font-family: "Archivo Black";
+  src: url("/assets/fonts/ArchivoBlack-Regular.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/assets/fonts/SpaceMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Mono";
+  src: url("/assets/fonts/SpaceMono-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --bg: #18171b;
+  --ink: #efe6cf;
+  --hi: #ffd23b;
+  --line: color-mix(in srgb, var(--ink) 35%, transparent);
+  --ticker-s: 22s;
+  --gap: clamp(8px, 1.1vw, 18px);
+  --radius: clamp(4px, 0.6vw, 10px);
+  --display: "Archivo Black", "Arial Black", system-ui, sans-serif;
+  --mono: "Space Mono", ui-monospace, Menlo, Consolas, monospace;
+  --small: clamp(10px, 0.95vw, 15px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--small);
+  overflow-x: hidden;
+}
+
+.poster {
+  position: relative;
+  height: 100dvh;
+  padding: var(--gap);
+  display: grid;
+  /* The panels take what their pictures need; the logo grows into what's left. */
+  grid-template-rows: auto minmax(12vh, 1fr) auto minmax(0, max-content) auto;
+  gap: var(--gap);
+}
+
+/* A fine dot grain over everything, plus faint TV lines. */
+.poster::before,
+body.scanlines .poster::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.poster::before {
+  background-image: radial-gradient(color-mix(in srgb, var(--ink) 7%, transparent) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+body.scanlines .poster::after {
+  background: repeating-linear-gradient(0deg, rgb(0 0 0 / 0.16) 0 1px, transparent 1px 3px);
+}
+
+/* ---------- Scrolling strips ---------- */
+.ticker {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  white-space: nowrap;
+  letter-spacing: 0.1em;
+  padding: 0.45em 0;
+}
+.ticker .track {
+  display: flex;
+  width: max-content;
+  animation: slide var(--ticker-s) linear infinite;
+}
+.ticker.bottom .track { animation-direction: reverse; }
+@keyframes slide { to { transform: translateX(-50%); } }
+
+/* ---------- Logo ---------- */
+.logo-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--gap);
+  align-items: stretch;
+  min-height: 0;
+}
+/* poster.ts sizes the logo to fill its box, on one line or stacked. */
+.logo {
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 80px;
+  line-height: 0.82;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.logo.one-line { flex-direction: row; align-items: flex-end; justify-content: flex-start; gap: 0.25em; }
+.logo span { display: block; }
+.stamp {
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
+  border-radius: var(--radius);
+  padding: 0.8em;
+  width: clamp(110px, 11vw, 190px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: right;
+}
+.stamp strong {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(14px, 1.6vw, 26px);
+  line-height: 1;
+}
+.stamp strong span { display: block; }
+
+/* ---------- Info bar ---------- */
+.infobar {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.infobar > div {
+  padding: 0.6em 1.1em;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+.infobar > div:last-child { border-right: 0; }
+.infobar .info { overflow: hidden; text-overflow: ellipsis; }
+.infobar .title { font-weight: 700; }
+.cursor { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- Game panels ---------- */
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--gap);
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px; /* room for the selection glow */
+  scrollbar-width: thin;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg);
+}
+.panel .hd {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.45em 0.8em;
+  border-bottom: 1px solid var(--line);
+}
+.panel .pic {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+.panel .pic > .still,
+.panel .pic > .clip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.panel .pic > .art { image-rendering: pixelated; }
+.panel .clip { opacity: 0; transition: opacity 0.2s; }
+.panel .clip.playing { opacity: 1; }
+.panel .ft { padding: 0.7em 0.8em; }
+.panel h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(16px, 1.9vw, 30px);
+  line-height: 1;
+}
+.panel h2 .arrow { display: none; color: var(--hi); }
+.panel .ft p { margin: 0.4em 0 0; opacity: 0.7; }
+
+.panel.soon .pic {
+  background: repeating-linear-gradient(45deg, #222 0 12px, #1b1b1f 12px 24px);
+  display: grid;
+  place-items: center;
+  letter-spacing: 0.2em;
+}
+
+.panel.sel {
+  border-color: var(--hi);
+  box-shadow: 0 0 0 3px var(--hi);
+}
+.panel.sel .hd { background: var(--hi); color: var(--bg); border-bottom-color: var(--hi); }
+.panel.sel h2 .arrow { display: inline; }
+
+.panel.nope { animation: nope 0.35s; }
+@keyframes nope {
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.panel.starting { animation: flash 0.15s steps(2) 4; }
+@keyframes flash { 50% { box-shadow: 0 0 0 6px var(--ink); } }
+
+/* ---------- GAME START! and the fade ---------- */
+.game-start {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 10;
+  padding: 0.15em 0;
+  text-align: center;
+  font-family: var(--display);
+  font-size: min(11vw, 20vh);
+  line-height: 1;
+  color: var(--bg);
+  background: var(--hi);
+  border-block: 6px solid var(--ink);
+  pointer-events: none;
+  opacity: 0;
+}
+.game-start.show { animation: stamp 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) forwards; }
+@keyframes stamp {
+  from { opacity: 0; transform: scale(2.2); }
+  to { opacity: 1; transform: scale(1); }
+}
+.fade {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.fade.show { opacity: 1; }
+
+/* ---------- Phones and narrow or tall windows: one long scrolling poster ---------- */
+@media (max-width: 720px), (max-aspect-ratio: 4/5) {
+  .poster { height: auto; min-height: 100dvh; grid-template-rows: auto auto auto auto auto; }
+  .logo-row { grid-template-columns: 1fr; }
+  .stamp { width: auto; flex-direction: row; align-items: center; text-align: left; gap: 1em; }
+  .stamp strong span { display: inline; margin-right: 0.3em; }
+  .infobar { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .infobar .label, .infobar .clock { display: none; }
+  .infobar .info { white-space: normal; }
+  .panels { overflow: visible; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker .track, .cursor, .panel.nope, .panel.starting { animation: none; }
+  .game-start.show { animation: none; opacity: 1; }
+}
