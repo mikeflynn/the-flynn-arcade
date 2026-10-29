@@ -1,8 +1,7 @@
 import Phaser from "phaser";
-import { bakeFighter } from "@web-games/rig/canvas";
 import { FighterSprite } from "@web-games/rig/phaser";
-import { ANIMS } from "../animations";
 import type { FlowState } from "../flow";
+import { bakedFighter } from "../render/bakeCache";
 import { addLogo, makeLogo } from "../render/logo";
 import { flashOn, label, pickPressed, useMenuControls } from "../render/menu";
 import { drawStage, type StageView } from "../render/stageView";
@@ -41,7 +40,7 @@ export class ChampScene extends Phaser.Scene {
     const champ = this.flow.p1;
 
     this.stageView = drawStage(this, stageById(champ.stage));
-    const baked = bakeFighter(champ.look, { win: ANIMS.win! }, { fps: settings.animationFps, overrides: parts.get(champ.id) });
+    const baked = bakedFighter(champ.id, champ.look, settings.animationFps, parts.get(champ.id)); // already baked for the last fight
     this.sprite = new FighterSprite(this, `champ-${champCount++}`, baked).setPosition(480, 488);
     this.sprite.image.setDepth(5);
 

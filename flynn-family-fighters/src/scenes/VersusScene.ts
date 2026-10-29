@@ -1,10 +1,9 @@
 import Phaser from "phaser";
 import { alternateColors } from "@web-games/rig";
-import { bakeFighter } from "@web-games/rig/canvas";
 import { FighterSprite } from "@web-games/rig/phaser";
-import { ANIMS } from "../animations";
 import { ladderDifficulty } from "../engine/ladder";
 import { afterMatch, opponent, type FlowState } from "../flow";
+import { bakedFighter } from "../render/bakeCache";
 import { addLogo, ICE_BANDS, makeLogo } from "../render/logo";
 import { label, place } from "../render/menu";
 import { settings } from "../settings";
@@ -52,7 +51,9 @@ export class VersusScene extends Phaser.Scene {
     fighters.forEach((f, i) => {
       // A mirror match: player 2 wears different colors.
       const look = i === 1 && f.id === fighters[0].id ? alternateColors(f.look) : f.look;
-      const baked = bakeFighter(look, { win: ANIMS.win! }, { fps: settings.animationFps, overrides: parts.get(f.id) });
+      // The whole fight's worth of animations is baked here, while the versus screen
+      // is up, and kept: the fight then starts without a pause.
+      const baked = bakedFighter(f.id, look, settings.animationFps, parts.get(f.id));
       const sprite = new FighterSprite(this, `versus-${i}-${versusCount++}`, baked).setFacing(i === 0 ? 1 : -1).setPosition(FIGHTER_X[i], FEET_Y);
       this.sprites.push(sprite);
       place(label(this, f.name, 0, 0, { size: f.name.length <= 7 ? 48 : 32, color: i === 0 ? "#bcd6ff" : "#ffc4c4" }), FIGHTER_X[i], FEET_Y + 12, "center");

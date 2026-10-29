@@ -1,10 +1,10 @@
 import type Phaser from "phaser";
 import type { Look, ShapeName } from "@web-games/rig";
-import { bakeFighter } from "@web-games/rig/canvas";
 import { FighterSprite } from "@web-games/rig/phaser";
-import { ANIMS, animFor } from "../animations";
+import { animFor } from "../animations";
 import type { FighterState, MatchState } from "../engine/types";
 import { settings } from "../settings";
+import { bakedFighter } from "./bakeCache";
 
 /** Pictures that replace parts of a fighter (public/assets/fighters/<id>/<part>.png). */
 export type PartPictures = Partial<Record<ShapeName, CanvasImageSource>>;
@@ -17,7 +17,7 @@ const SHAKY: readonly FighterState["state"][] = ["hitstun", "knockdown", "dizzy"
 let textureCounter = 0;
 
 /**
- * One fighter on screen. It bakes the fighter's sprite pages once, then each
+ * One fighter on screen. It gets the fighter's baked sprite pages (see bakeCache.ts), then each
  * frame shows the animation frame the engine's state asks for. Frames snap
  * from one picture to the next, like SF2: there is no blending between animations.
  */
@@ -25,7 +25,7 @@ export class FighterView {
   readonly sprite: FighterSprite;
 
   constructor(scene: Phaser.Scene, id: string, look: Look, parts: PartPictures = {}) {
-    const baked = bakeFighter(look, ANIMS, { fps: settings.animationFps, overrides: parts });
+    const baked = bakedFighter(id, look, settings.animationFps, parts); // baked once, reused by rematches
     // Every sprite needs its own texture name: two fighters sharing one would erase each other's pictures.
     this.sprite = new FighterSprite(scene, `fight-${id}-${textureCounter++}`, baked);
     this.sprite.image.setDepth(5);
