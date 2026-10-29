@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { normalizeFighter } from "../src/fighter";
 
@@ -74,11 +75,14 @@ describe("normalizeFighter", () => {
 // The character files are kid files: kids add, delete and change them. This
 // only checks what must stay true after any edit: each one becomes a fighter.
 // (Warnings are fine: they're how the game explains a typo.)
-const characterFiles = import.meta.glob<{ fighter?: unknown }>("../src/characters/*.ts", { eager: true });
+// (The folder is read directly, not with import.meta.glob, whose list the test
+// cache can keep stale after a new file is added.)
+const charactersDir = new URL("../src/characters/", import.meta.url);
+const characterFiles = readdirSync(charactersDir).filter((file) => file.endsWith(".ts"));
 
 describe("the character files", () => {
-  it.each(Object.entries(characterFiles))("%s becomes a fighter", (path, mod) => {
-    const id = path.split("/").pop()!.replace(/\.ts$/, "");
-    expect(normalizeFighter(mod.fighter, id, undefined, () => {})).not.toBeNull();
+  it.each(characterFiles)("%s becomes a fighter", async (file) => {
+    const mod = (await import(new URL(file, charactersDir).href)) as { fighter?: unknown };
+    expect(normalizeFighter(mod.fighter, file.replace(/\.ts$/, ""), undefined, () => {})).not.toBeNull();
   });
 });
