@@ -1,5 +1,5 @@
 import { clampSettings, type Limits } from "@web-games/settings";
-import { rotateHue } from "./color";
+import { alternateColor } from "./color";
 
 // Every list below is what a kid can type into a character file.
 export const BODY_FRAMES = ["masculine", "feminine"] as const;
@@ -43,6 +43,26 @@ export interface Look {
   accent: string;
   weapon: Choice<typeof WEAPONS>;
 }
+
+/**
+ * A field as a character file may write it: numbers may also be words (like
+ * "tall"), lists may be one item, and objects may leave fields out.
+ * normalizeLook() turns any of that into a real Look.
+ */
+type Loose<T> = T extends number
+  ? number | (string & {})
+  : T extends boolean
+    ? boolean
+    : T extends string
+      ? T
+      : T extends readonly (infer U)[]
+        ? Loose<U>[] | Loose<U>
+        : T extends object
+          ? { [K in keyof T]?: Loose<T[K]> }
+          : T;
+
+/** What a character file writes for `look`: every field optional, and a typo still typechecks. */
+export type LookFile = { [K in keyof Look]?: Loose<Look[K]> };
 
 /** Colin, from the spike. Anything a character file leaves out comes from here. */
 export const DEFAULT_LOOK: Look = {
@@ -153,8 +173,12 @@ export function normalizeLook(raw: unknown, warn: (message: string) => void = co
   };
 }
 
-/** A second outfit for when both fighters would wear the same colors: clothes spin 180° around the color wheel. */
+/**
+ * A second outfit for when both fighters would wear the same colors. Colorful
+ * clothes spin 180° around the color wheel; black, white and gray ones (which
+ * a spin can't change) get lighter or darker instead (see alternateColor).
+ */
 export function alternateColors(look: Look): Look {
-  const spin = (c: string) => rotateHue(c, 180);
-  return { ...look, top: spin(look.top), bottom: spin(look.bottom), accent: spin(look.accent), belt: spin(look.belt) };
+  const alt = alternateColor;
+  return { ...look, top: alt(look.top), bottom: alt(look.bottom), accent: alt(look.accent), belt: alt(look.belt) };
 }

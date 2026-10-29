@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { hex } from "../src/color";
 import { DEFAULT_LOOK, alternateColors, normalizeLook } from "../src/look";
 
 describe("normalizeLook", () => {
@@ -62,5 +63,24 @@ describe("alternateColors", () => {
     expect(alt.hair.color).toBe(DEFAULT_LOOK.hair.color);
     expect(alt.skin).toBe(DEFAULT_LOOK.skin);
     expect(alternateColors(alt).top).not.toBe(alt.top);
+  });
+
+  /** How far apart two colors are (0 = the same, about 441 = black vs white). */
+  const distance = (a: string, b: string) => {
+    const [x, y] = [hex(a, 0), hex(b, 0)];
+    const ch = (n: number, s: number) => (n >> s) & 255;
+    return Math.hypot(ch(x, 16) - ch(y, 16), ch(x, 8) - ch(y, 8), ch(x, 0) - ch(y, 0));
+  };
+
+  it.each(["#000000", "#ffffff", "#808080", "#1d1d1d", "#e8e8e8", "#000010"])(
+    "gives a black, white or gray outfit (%s) a clearly different color",
+    (color) => {
+      const alt = alternateColors({ ...DEFAULT_LOOK, top: color, bottom: color, belt: color, accent: color });
+      for (const c of [alt.top, alt.bottom, alt.belt, alt.accent]) expect(distance(c, color)).toBeGreaterThanOrEqual(100);
+    },
+  );
+
+  it("still spins colorful clothes around the color wheel", () => {
+    expect(alternateColors({ ...DEFAULT_LOOK, top: "#ff0000" }).top).toBe("#00ffff");
   });
 });
