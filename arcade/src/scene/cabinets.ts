@@ -91,7 +91,7 @@ export class CabinetRow {
   private buildCabinet(slot: Slot, i: number): Phaser.GameObjects.Container {
     const cabinet = this.scene.add.container(i * SPACING, 0).setScale(OTHER_SCALE);
     this.row.add(cabinet);
-    const look = slot.kind === "game" ? slot.game.colors : colors.comingSoon;
+    const look = colors.comingSoon; // replaced by the poster in Task 4
     const key = slot.kind === "game" ? `cabinet-${slot.game.id}` : "cabinet-soon";
     makeSpriteSheet(this.scene, key, [cabinetArt], cabinetPalette(look.primary, look.secondary));
     cabinet.add(this.scene.add.image(0, 0, key, 0).setOrigin(0.5, 1));

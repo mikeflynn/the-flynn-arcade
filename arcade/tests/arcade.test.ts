@@ -16,7 +16,6 @@ const game = (id: string): GameInfo => ({
   title: id.toUpperCase(),
   blurb: "",
   players: { min: 1, max: 1, coop: false },
-  colors: { primary: "#ff0000", secondary: "#00ff00" },
   devPort: 8009,
   screenArt: { colors: {}, art: [] },
 });

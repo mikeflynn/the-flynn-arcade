@@ -1,18 +1,53 @@
 import { describe, expect, it, vi } from "vitest";
-import { arcadeUrl, fromGameId, gameUrl, validateGames, type GameInfo } from "../src/index";
+import { arcadeUrl, fromGameId, gameUrl, TAGLINE_MAX, validateGames, type GameInfo } from "../src/index";
 
 const game = (overrides: Partial<GameInfo> = {}): GameInfo => ({
   id: "space-pong",
   title: "SPACE PONG",
   blurb: "Bounce the ball past your friend!",
   players: { min: 1, max: 2, coop: false },
-  colors: { primary: "#ff0000", secondary: "#00ff00" },
   devPort: 8002,
   screenArt: { colors: { W: "#ffffff" }, art: ["W.W", ".W."] },
   ...overrides,
 });
 
 describe("validateGames", () => {
+  it("still accepts an old arcade.ts that has cabinet colors, and drops them", () => {
+    const warn = vi.fn();
+    const old = { ...game(), colors: { primary: "#000000", secondary: "#ffffff" } };
+    const games = validateGames([{ folder: "space-pong", info: old }], warn);
+    expect(games).toHaveLength(1);
+    expect("colors" in games[0]).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("keeps a short tagline", () => {
+    const games = validateGames([{ folder: "space-pong", info: game({ tagline: "Dodge dogs, grab donuts" }) }], vi.fn());
+    expect(games[0].tagline).toBe("Dodge dogs, grab donuts");
+  });
+
+  it("drops a tagline that is too long or not text, with a note", () => {
+    for (const tagline of ["x".repeat(TAGLINE_MAX + 1), 42 as unknown as string]) {
+      const warn = vi.fn();
+      const games = validateGames([{ folder: "space-pong", info: game({ tagline }) }], warn);
+      expect(games).toHaveLength(1);
+      expect(games[0].tagline).toBeUndefined();
+      expect(warn.mock.calls[0][0]).toContain("tagline");
+    }
+  });
+
+  it("drops a broken capture recipe, with a note", () => {
+    const warn = vi.fn();
+    const broken = game({ capture: { steps: "go right" } as unknown as GameInfo["capture"] });
+    const games = validateGames([{ folder: "space-pong", info: broken }], warn);
+    expect(games).toHaveLength(1);
+    expect(games[0].capture).toBeUndefined();
+    expect(warn.mock.calls[0][0]).toContain("capture");
+
+    const good = { query: "?level=1", steps: [{ hold: ["ArrowRight"], ms: 500 }] };
+    expect(validateGames([{ folder: "space-pong", info: game({ capture: good }) }], vi.fn())[0].capture).toEqual(good);
+  });
+
   it("keeps good registrations", () => {
     const warn = vi.fn();
     expect(validateGames([{ folder: "space-pong", info: game() }], warn)).toEqual([game()]);

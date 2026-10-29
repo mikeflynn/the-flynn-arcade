@@ -39,7 +39,7 @@ export class InfoPanel {
   show(slot: Slot): void {
     const game = slot.kind === "game" ? slot.game : null;
     this.accent.clear();
-    this.accent.fillStyle(toColor(game ? game.colors.primary : "#9aa3b5"), 1);
+    this.accent.fillStyle(toColor("#9aa3b5"), 1);
     this.accent.fillPoints(
       [
         new Phaser.Geom.Point(5 + SLANT, TOP + 1),

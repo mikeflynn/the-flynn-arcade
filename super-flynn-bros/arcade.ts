@@ -1,20 +1,21 @@
 // 🕹️ HOW SUPER FLYNN BROS SHOWS UP IN THE FLYNN ARCADE
 //
-// The arcade reads this file to build this game's cabinet: the name on the
-// marquee, the colors, the little picture on its screen, and the info at the
-// bottom of the arcade screen.
+// The arcade reads this file to build this game's panel on the arcade
+// poster: the title, the short tagline under it, the blurb in the info bar,
+// and the little picture shown when the game has no screenshot yet.
 //
-// 🛠️ TRY THIS: change the cabinet colors, or redraw the picture on its screen
-// (each letter is one pixel; up to 32 wide and 24 tall).
+// 🛠️ TRY THIS: change the tagline, or redraw the little picture (each letter
+// is one pixel; up to 32 wide and 24 tall).
 
 import type { GameInfo } from "@web-games/arcade";
 
 export const arcadeInfo: GameInfo = {
   id: "super-flynn-bros",
   title: "SUPER FLYNN BROS",
+  // The short line under the title on the arcade poster (up to 40 letters).
+  tagline: "Dodge dogs, grab donuts!",
   blurb: "Help Colin and Ryan get to school, practice, and back home! Dodge dogs, grab donuts!",
   players: { min: 1, max: 2, coop: true },
-  colors: { primary: "#5ab0f0", secondary: "#f6d860" },
   devPort: 8001,
   order: 1,
   screenArt: {
@@ -57,6 +58,21 @@ export const arcadeInfo: GameInfo = {
       "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
       "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
       "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+    ],
+  },
+  // How the arcade's capture script plays this game to record its clip
+  // (npm run capture -w arcade -- super-flynn-bros). Keys are held or tapped,
+  // step by step, over and over until the clip is done.
+  capture: {
+    query: "?level=1&mode=colin",
+    warmupMs: 2500,
+    clipMs: 7000,
+    steps: [
+      { hold: ["ArrowRight"], ms: 900 },
+      { hold: ["ArrowRight"], press: ["Space"], ms: 700 },
+      { hold: ["ArrowRight"], ms: 1200 },
+      { press: ["Space"], ms: 600 },
+      { hold: ["ArrowRight"], press: ["Space"], ms: 900 },
     ],
   },
 };

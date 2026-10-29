@@ -240,5 +240,5 @@ That's OK. Everybody breaks things, and it's how you learn!
 - Shared libraries used: [`lib/input`](../lib/input), [`lib/pixel-art`](../lib/pixel-art),
   [`lib/audio`](../lib/audio), [`lib/settings`](../lib/settings), [`lib/arcade`](../lib/arcade).
 - [`arcade.ts`](arcade.ts) is how this game shows up in The Flynn Arcade
-  (cabinet colors, blurb, and the picture on its screen).
+  (title, tagline, blurb, the little picture, and how to record its clip).
 - **Asset credits:** all art is drawn in code in this repo. No third-party assets.

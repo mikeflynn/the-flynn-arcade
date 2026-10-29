@@ -1,20 +1,21 @@
 // 🕹️ HOW FLYNN FAMILY FIGHTERS SHOWS UP IN THE FLYNN ARCADE
 //
-// The arcade reads this file to build this game's cabinet: the name on the
-// marquee, the colors, the little picture on its screen, and the info at the
-// bottom of the arcade screen.
+// The arcade reads this file to build this game's panel on the arcade
+// poster: the title, the short tagline under it, the blurb in the info bar,
+// and the little picture shown when the game has no screenshot yet.
 //
-// 🛠️ TRY THIS: change the cabinet colors, or redraw the picture on its screen
-// (each letter is one pixel; up to 32 wide and 24 tall).
+// 🛠️ TRY THIS: change the tagline, or redraw the little picture (each letter
+// is one pixel; up to 32 wide and 24 tall).
 
 import type { GameInfo } from "@web-games/arcade";
 
 export const arcadeInfo: GameInfo = {
   id: "flynn-family-fighters",
   title: "FLYNN FAMILY FIGHTERS",
+  // The short line under the title on the arcade poster (up to 40 letters).
+  tagline: "Pick a Flynn, throw fireballs!",
   blurb: "Street-fighter style showdowns! Pick a Flynn, throw fireballs, and win the tournament!",
   players: { min: 1, max: 2, coop: false },
-  colors: { primary: "#ff4040", secondary: "#ffe14a" },
   devPort: 8002,
   order: 2,
   screenArt: {
@@ -61,4 +62,8 @@ export const arcadeInfo: GameInfo = {
       "RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR",
     ],
   },
+  // How the arcade's capture script plays this game to record its clip
+  // (npm run capture -w arcade -- flynn-family-fighters). The computer plays
+  // both sides, so nobody has to press anything.
+  capture: { query: "?fight=colin,ryan&cpu2", warmupMs: 6000, clipMs: 7000 },
 };
