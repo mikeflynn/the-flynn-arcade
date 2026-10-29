@@ -24,10 +24,10 @@ If only **one** fighter is in the game, arcade mode is a mirror match: you fight
 | Move | W A S D | Arrow keys |
 | Light / Medium / Heavy Punch | R / T / Y | I / O / P (or number pad 4 / 5 / 6) |
 | Light / Medium / Heavy Kick | F / G / H | K / L / ; (or number pad 1 / 2 / 3) |
-| Start / pick | 1 | Enter |
+| Start / pick / pause | 1 | Enter |
 | Gamepad | First gamepad | Second gamepad |
 
-- **Gamepad:** D-pad or left stick moves. X, Y and RB are the punches (light, medium, heavy). A, B and RT are the kicks. Start picks.
+- **Gamepad:** D-pad or left stick moves. X, Y and RB are the punches (light, medium, heavy). A, B and RT are the kicks. Start picks, and pauses a fight.
 - **M** turns the sound on and off.
 - **QUIT TO ARCADE** (title menu) takes you back to The Flynn Arcade.
 - Two players on one keyboard? Some keyboards can't feel lots of keys at once ("key ghosting"). Gamepads work best.

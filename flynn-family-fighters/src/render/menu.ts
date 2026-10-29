@@ -105,6 +105,12 @@ export class Menu {
     return null;
   }
 
+  /** Removes the menu from the screen. */
+  destroy(): void {
+    this.items.forEach((t) => t.destroy());
+    this.arrow.destroy();
+  }
+
   private highlight(): void {
     this.items.forEach((t, i) => t.setColor(i === this.index ? "#ffd23b" : "#ffffff"));
     const chosen = this.items[this.index]!;

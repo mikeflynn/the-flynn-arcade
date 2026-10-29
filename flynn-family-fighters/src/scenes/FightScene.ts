@@ -12,6 +12,7 @@ import { Effects } from "../render/effects";
 import { FighterView } from "../render/FighterView";
 import { Hud } from "../render/hud";
 import { stepsToRun } from "../render/loop";
+import { label, Menu } from "../render/menu";
 import { drawStage, type StageView } from "../render/stageView";
 import { settings } from "../settings";
 import type { StageDef } from "../stages";
@@ -32,6 +33,7 @@ export interface FightData {
 /** After the match is decided, wait this many steps before moving on. */
 const MATCH_END_STEPS = 180;
 const PLAYERS = [0, 1] as const;
+const PAUSE_OPTIONS = ["RESUME", "QUIT TO TITLE"] as const;
 
 /** A heavy normal (HP or HK), a special or a throw: these shake the screen. */
 const isHeavy = (name = "") => !(name in NORMALS) || /H[PK]$/.test(name);
@@ -51,6 +53,8 @@ export class FightScene extends Phaser.Scene {
   private hud!: Hud;
   private accMs = 0;
   private endSteps = -1;
+  /** The pause menu, while the game is paused (Start pauses). */
+  private pause: { box: Phaser.GameObjects.Rectangle; title: Phaser.GameObjects.Text; menu: Menu } | null = null;
 
   constructor() {
     super("fight");
@@ -60,6 +64,7 @@ export class FightScene extends Phaser.Scene {
     this.fight = data;
     this.accMs = 0;
     this.endSteps = -1;
+    this.pause = null;
   }
 
   create(): void {
@@ -97,6 +102,10 @@ export class FightScene extends Phaser.Scene {
   }
 
   update(time: number, deltaMs: number): void {
+    if (this.pause) {
+      this.updatePaused(time);
+      return;
+    }
     const { steps, accMs } = stepsToRun(this.accMs, deltaMs, settings.gameSpeed);
     this.accMs = accMs;
     if (steps > 0) {
@@ -104,9 +113,47 @@ export class FightScene extends Phaser.Scene {
       const { input, audio } = getServices();
       input.update();
       if (input.anyJustPressed("mute")) audio.toggleMute();
+      // Start pauses, until the match is over (then the after-match menu takes over).
+      if (input.anyJustPressed("start") && this.endSteps < 0) {
+        this.openPause();
+        return;
+      }
       for (let n = 0; n < steps; n++) this.tick();
     }
     this.draw(time);
+  }
+
+  /** Freezes the fight and shows the pause menu on top. */
+  private openPause(): void {
+    const { audio } = getServices();
+    audio.playSfx("menuSelect");
+    const h = 112 + PAUSE_OPTIONS.length * 56;
+    const top = Math.round((540 - h) / 4) * 2;
+    const box = this.add.rectangle(480, top + h / 2, 600, h, 0x160c22).setStrokeStyle(8, 0xffd23b).setDepth(20);
+    const title = label(this, "PAUSED", 480, top + 32, { align: "center", color: "#ffd23b" }).setDepth(21);
+    this.pause = { box, title, menu: new Menu(this, PAUSE_OPTIONS, 480, top + 96, 56, 21) };
+  }
+
+  /** While paused the fight stands still; only the pause menu moves. */
+  private updatePaused(time: number): void {
+    const { input, audio } = getServices();
+    input.update();
+    if (input.anyJustPressed("mute")) audio.toggleMute();
+    const picked = this.pause!.menu.update(input, audio, time);
+    if (picked === null) return;
+    if (PAUSE_OPTIONS[picked] === "QUIT TO TITLE") {
+      this.scene.start("title");
+      return;
+    }
+    this.closePause();
+  }
+
+  private closePause(): void {
+    if (!this.pause) return;
+    this.pause.box.destroy();
+    this.pause.title.destroy();
+    this.pause.menu.destroy();
+    this.pause = null;
   }
 
   /** One game step: inputs in, events out. */
@@ -204,6 +251,7 @@ export class FightScene extends Phaser.Scene {
 
   /** Frees this match's fighter textures so the next match starts clean. */
   private cleanUp(): void {
+    this.closePause();
     this.views.forEach((v) => v.destroy());
     this.views = [];
     this.effects.destroy();
