@@ -32,3 +32,19 @@ export function nextAttractIndex(current: number, slots: Slot[]): number {
   }
   return current;
 }
+
+export type Direction = "left" | "right" | "up" | "down";
+
+/**
+ * Where the selection goes when a direction is pressed. Panels sit in rows of
+ * `columns`: left and right wrap around every panel; up and down jump a whole
+ * row, and stay put when there's no panel there.
+ */
+export function moveSelection(index: number, dir: Direction, columns: number, count: number): number {
+  if (count <= 0) return 0;
+  if (dir === "left") return wrap(index - 1, count);
+  if (dir === "right") return wrap(index + 1, count);
+  const cols = Math.max(1, Math.floor(columns) || 1);
+  const next = index + (dir === "down" ? cols : -cols);
+  return next >= 0 && next < count ? next : index;
+}

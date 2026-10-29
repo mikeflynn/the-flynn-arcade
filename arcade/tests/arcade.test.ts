@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { GameInfo } from "@web-games/arcade";
 import { mySettings } from "../src/settings";
 import { settingLimits } from "../src/limits";
-import { buildSlots, initialIndex, nextAttractIndex, wrap } from "../src/selection";
+import { buildSlots, initialIndex, moveSelection, nextAttractIndex, wrap } from "../src/selection";
+import { AttractClock } from "../src/attract";
+import { mediaByGame, pictureFor } from "../src/media";
+import { drawScreenArt } from "../src/screenArt";
 import { loadArcadeSettings, saveArcadeSettings, type StorageLike } from "../src/storage";
 import { collectRegistrations, folderOf, loadGames } from "../src/games";
 import { playerLabel } from "../src/badges";
@@ -155,5 +158,77 @@ describe("player label", () => {
     expect(playerLabel({ min: 1, max: 2, coop: true })).toBe("1–2P CO-OP");
     expect(playerLabel({ min: 1, max: 2, coop: false })).toBe("1–2P VS");
     expect(playerLabel({ min: 1, max: 1, coop: false })).toBe("1P");
+  });
+});
+
+describe("moveSelection", () => {
+  it("left and right wrap around every panel", () => {
+    expect(moveSelection(4, "right", 3, 5)).toBe(0);
+    expect(moveSelection(0, "left", 3, 5)).toBe(4);
+  });
+  it("up and down move a whole row, and stay put when there's nothing there", () => {
+    expect(moveSelection(1, "down", 3, 5)).toBe(4);
+    expect(moveSelection(2, "down", 3, 5)).toBe(2);
+    expect(moveSelection(4, "up", 3, 5)).toBe(1);
+    expect(moveSelection(0, "up", 3, 5)).toBe(0);
+  });
+  it("treats one column (or a broken count) as a single column", () => {
+    expect(moveSelection(0, "down", 1, 5)).toBe(1);
+    expect(moveSelection(0, "down", 0, 5)).toBe(1);
+  });
+  it("is 0 with no panels", () => {
+    expect(moveSelection(0, "right", 3, 0)).toBe(0);
+  });
+});
+
+describe("AttractClock", () => {
+  it("starts after the wait, then steps every stepMs", () => {
+    const clock = new AttractClock(30000, 6000, 0);
+    expect(clock.tick(29999)).toBe(false);
+    expect(clock.active).toBe(false);
+    expect(clock.tick(30001)).toBe(true);
+    expect(clock.active).toBe(true);
+    expect(clock.tick(30002)).toBe(false);
+    expect(clock.tick(36001)).toBe(true);
+  });
+  it("stops when someone presses something, and waits again", () => {
+    const clock = new AttractClock(30000, 6000, 0);
+    clock.tick(30001);
+    clock.poke(40000);
+    expect(clock.active).toBe(false);
+    expect(clock.tick(69999)).toBe(false);
+  });
+});
+
+describe("media", () => {
+  it("finds each game's screenshot and clip", () => {
+    const media = mediaByGame({
+      "../../a/arcade-media/screenshot.png": "/s.png",
+      "../../a/arcade-media/clip.mp4": "/c.mp4",
+      "../../b/arcade-media/notes.txt": "/n",
+    });
+    expect(media.get("a")).toEqual({ screenshot: "/s.png", clip: "/c.mp4" });
+    expect(media.has("b")).toBe(false);
+  });
+
+  it("picks the clip, the screenshot or the little picture", () => {
+    const both = { screenshot: "/s.png", clip: "/c.mp4" };
+    const o = { selected: true, reducedMotion: false, clipFailed: false };
+    expect(pictureFor(both, o)).toBe("clip");
+    expect(pictureFor(both, { ...o, selected: false })).toBe("screenshot");
+    expect(pictureFor(both, { ...o, reducedMotion: true })).toBe("screenshot");
+    expect(pictureFor(both, { ...o, clipFailed: true })).toBe("screenshot");
+    expect(pictureFor({ clip: "/c.mp4" }, { ...o, selected: false })).toBe("art");
+    expect(pictureFor(undefined, o)).toBe("art");
+  });
+});
+
+describe("drawScreenArt", () => {
+  it("draws one square per letter it knows, and says how big the picture is", () => {
+    const calls: [string, number, number, number, number][] = [];
+    const ctx = { fillStyle: "" as string, fillRect(x: number, y: number, w: number, h: number) { calls.push([this.fillStyle, x, y, w, h]); } };
+    const size = drawScreenArt(ctx, { colors: { A: "#ff0000", B: "#00ff00" }, art: ["AB", "BZ"] });
+    expect(size).toEqual({ width: 2, height: 2 });
+    expect(calls).toEqual([["#ff0000", 0, 0, 1, 1], ["#00ff00", 1, 0, 1, 1], ["#00ff00", 0, 1, 1, 1]]);
   });
 });
