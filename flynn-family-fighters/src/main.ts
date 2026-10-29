@@ -1,8 +1,18 @@
 import Phaser from "phaser";
+import { AfterMatchScene } from "./scenes/AfterMatchScene";
 import { BootScene, type BootRequest } from "./scenes/BootScene";
+import { ChampScene } from "./scenes/ChampScene";
 import { FightScene } from "./scenes/FightScene";
-import { PlaceholderScene } from "./scenes/PlaceholderScene";
+import { SelectScene } from "./scenes/SelectScene";
+import { TitleScene } from "./scenes/TitleScene";
+import { VersusScene } from "./scenes/VersusScene";
 import { ViewerScene } from "./scenes/ViewerScene";
+
+// Coming back with the browser's Back button can show a frozen copy of the
+// page. Reload it so the game starts fresh.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) window.location.reload();
+});
 
 // The world is 960 x 540 units. Each scene zooms its camera to 0.5, so one
 // unit is half a real pixel and fighters stay crisp.
@@ -24,7 +34,10 @@ function readRequest(): BootRequest {
 }
 
 const request = readRequest();
-const scenes = params.has("viewer") ? [ViewerScene] : request.fight ? [BootScene, FightScene] : [PlaceholderScene];
+// Boot runs first. The after-match menu comes after the fight so it draws on top.
+const scenes = params.has("viewer")
+  ? [ViewerScene]
+  : [BootScene, TitleScene, SelectScene, VersusScene, FightScene, AfterMatchScene, ChampScene];
 
 new Phaser.Game({
   type: Phaser.WEBGL,

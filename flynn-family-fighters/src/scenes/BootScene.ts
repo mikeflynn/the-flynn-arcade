@@ -18,6 +18,8 @@ export interface Services {
   input: InputManager;
   audio: GameAudio;
   roster: Fighter[];
+  /** Friendly messages about character files that couldn't be used. */
+  problems: string[];
   /** Pictures that replace parts of a fighter, by fighter id. */
   parts: Map<string, PartPictures>;
 }
@@ -41,7 +43,8 @@ const partKey = (id: string, part: string) => `part:${id}:${part}`;
 
 /**
  * Loads the font, the roster, any custom part pictures and sounds, then
- * starts the game. Missing pictures and sounds are simply skipped.
+ * opens the title screen (or a ?fight=... straight away). Missing pictures
+ * and sounds are simply skipped.
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -61,7 +64,8 @@ export class BootScene extends Phaser.Scene {
       findAllAssets(audioCandidates(soundEffects, musicTracks), exists),
     ]);
     problems.forEach((p) => console.warn(`🥊 ${p}`));
-    if (fighters.length === 0) {
+    const request = (this.registry.get("boot") as BootRequest | undefined) ?? {};
+    if (fighters.length === 0 && request.fight) {
       this.add.text(480, 270, "NO FIGHTERS FOUND\nCHECK src/characters/", { fontFamily: "monospace", fontSize: "32px", align: "center" }).setOrigin(0.5);
       return;
     }
@@ -73,12 +77,12 @@ export class BootScene extends Phaser.Scene {
     for (const [key, url] of pictures) this.load.image(key, url);
     this.load.once(Phaser.Loader.Events.COMPLETE, () => {
       // Sounds load after the pictures, with backups: a broken hit.mp3 falls back to hit.ogg.
-      loadSoundsWithBackups(this, audioFiles, () => this.finish(fighters, audioFiles));
+      loadSoundsWithBackups(this, audioFiles, () => this.finish(fighters, problems, audioFiles));
     });
     this.load.start();
   }
 
-  private finish(roster: Fighter[], audioFiles: Map<string, string[]>): void {
+  private finish(roster: Fighter[], problems: string[], audioFiles: Map<string, string[]>): void {
     const parts = new Map<string, PartPictures>();
     for (const f of roster) {
       const mine: PartPictures = {};
@@ -99,11 +103,11 @@ export class BootScene extends Phaser.Scene {
       muted: false,
     });
     audio.reportMissing();
-    services = { input: new InputManager(window), audio, roster, parts };
+    services = { input: new InputManager(window), audio, roster, problems, parts };
 
-    // For now Boot only runs for ?fight=... (the title and select screens come next).
     const request = (this.registry.get("boot") as BootRequest | undefined) ?? {};
     if (request.fight) this.startQuickFight(request.fight);
+    else this.scene.start("title");
   }
 
   /** ?fight=colin,ryan: the two fighters (or the first ones in the roster), and a rematch when it ends. */

@@ -23,6 +23,8 @@ export interface FightData {
   /** Which side the computer plays: [false, true] = you vs the CPU. */
   cpu: [boolean, boolean];
   stage: StageDef;
+  /** How hard the computer fights, 1 to 8 (default: cpuDifficulty in settings.ts). */
+  cpuLevel?: number;
   /** Called once, a few seconds after the match is won. */
   onDone: (winner: 0 | 1 | "draw") => void;
 }
@@ -74,7 +76,7 @@ export class FightScene extends Phaser.Scene {
 
     const seed = Date.now() >>> 0;
     this.match = createMatch({ p1, p2, settings, seed });
-    this.brains = PLAYERS.map((i) => (cpu[i] ? new CpuBrain(i, settings.cpuDifficulty, new Rng(seed + i + 1)) : null));
+    this.brains = PLAYERS.map((i) => (cpu[i] ? new CpuBrain(i, this.fight.cpuLevel ?? settings.cpuDifficulty, new Rng(seed + i + 1)) : null));
 
     // Against the computer, one player can use either side of the keyboard.
     input.clearBindings(1);
