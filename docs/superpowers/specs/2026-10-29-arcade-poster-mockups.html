@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcade poster directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bungee&family=Bungee+Shade&family=Press+Start+2P&family=Space+Mono:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root { --page: #111014; --ink: #f2ead8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font-family: "Space Mono", monospace; padding: 32px 16px 80px; }
+  .intro { max-width: 1100px; margin: 0 auto 28px; }
+  .intro h1 { font-family: "Archivo Black", sans-serif; font-size: 28px; margin: 0 0 8px; letter-spacing: .02em; }
+  .intro p { margin: 0; opacity: .75; font-size: 14px; line-height: 1.6; }
+  .choice { max-width: 1100px; margin: 0 auto 56px; cursor: pointer; }
+  .choice-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 12px; }
+  .choice-head .tag { font-family: "Archivo Black"; font-size: 22px; background: var(--ink); color: var(--page); padding: 2px 10px; }
+  .choice-head h2 { font-family: "Archivo Black"; font-size: 20px; margin: 0; }
+  .choice-head p { margin: 0; font-size: 13px; opacity: .7; }
+  .choice.selected .poster { outline: 4px solid #ffd23b; outline-offset: 6px; }
+  .poster { position: relative; aspect-ratio: 16 / 10; width: 100%; overflow: hidden; container-type: inline-size; border-radius: 6px; }
+  .note { font-size: 13px; opacity: .75; margin-top: 12px; line-height: 1.6; }
+  canvas.art { image-rendering: pixelated; width: 100%; height: auto; display: block; }
+
+  /* ---------- A: Gig poster (Nifty-style) ---------- */
+  .a { background: #18171b; color: #efe6cf; font-family: "Space Mono", monospace; padding: 1.6cqw; display: grid; grid-template-rows: auto auto auto 1fr auto; gap: 1.1cqw; }
+  .a::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px); background-size: .6cqw .6cqw; mix-blend-mode: screen; }
+  .a::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); }
+  .a .ticker { border: 1px solid #efe6cf55; border-radius: .6cqw; overflow: hidden; white-space: nowrap; font-size: 1.05cqw; letter-spacing: .1em; padding: .5cqw 0; }
+  .a .ticker span { display: inline-block; animation: slide 22s linear infinite; }
+  .a .ticker b { background: #efe6cf; color: #18171b; padding: 0 .4cqw; margin: 0 1.2cqw; }
+  .a .ticker.rev span { animation-direction: reverse; }
+  @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .a .logo { display: flex; align-items: stretch; gap: 1cqw; }
+  .a .logo h3 { margin: 0; font-family: "Archivo Black", sans-serif; font-size: 13.4cqw; line-height: .82; letter-spacing: -.02em; flex: 1; text-transform: uppercase; }
+  .a .logo .stamp { border: 1px solid #efe6cf88; border-radius: .6cqw; font-size: .95cqw; padding: .8cqw; display: flex; flex-direction: column; justify-content: space-between; width: 11cqw; text-align: right; }
+  .a .logo .stamp strong { font-family: "Archivo Black"; font-size: 1.6cqw; line-height: 1; }
+  .a .bar { display: grid; grid-template-columns: auto auto 1fr auto auto; border: 1px solid #efe6cf55; border-radius: .6cqw; font-size: 1.05cqw; }
+  .a .bar > div { padding: .6cqw 1.2cqw; border-right: 1px solid #efe6cf55; }
+  .a .bar > div:last-child { border-right: 0; }
+  .a .bar .blink { animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .a .games { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.1cqw; min-height: 0; }
+  .a .game { border: 1px solid #efe6cf55; border-radius: .6cqw; display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; position: relative; }
+  .a .game .hd { display: flex; justify-content: space-between; font-size: .95cqw; padding: .5cqw .8cqw; border-bottom: 1px solid #efe6cf55; }
+  .a .game .pic { position: relative; overflow: hidden; background: #000; }
+  .a .game .pic canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.9) contrast(1.05); }
+  .a .game .ft { padding: .7cqw .8cqw; }
+  .a .game .ft h4 { margin: 0; font-family: "Archivo Black"; font-size: 1.9cqw; line-height: 1; }
+  .a .game .ft p { margin: .4cqw 0 0; font-size: .9cqw; opacity: .7; }
+  .a .game.sel { border-color: #ffd23b; box-shadow: 0 0 0 .25cqw #ffd23b; }
+  .a .game.sel .hd { background: #ffd23b; color: #18171b; }
+  .a .game.sel .ft h4::after { content: " ▶"; color: #ffd23b; }
+  .a .game.soon .pic { background: repeating-linear-gradient(45deg, #222 0 1cqw, #1b1b1f 1cqw 2cqw); display: grid; place-items: center; font-size: 1.4cqw; letter-spacing: .2em; }
+  .a .foot { display: flex; justify-content: space-between; font-size: 1cqw; opacity: .8; }
+
+  /* ---------- B: Neon cabinet poster ---------- */
+  .b { background: radial-gradient(ellipse at 50% 120%, #ff2bd6 0%, #5b0e7a 28%, #1a0630 60%, #0a0414 100%); color: #fff; font-family: "Space Mono"; display: grid; grid-template-rows: auto 1fr auto; padding: 2cqw 2.4cqw 1.6cqw; }
+  .b .floor { position: absolute; left: -20%; right: -20%; bottom: 0; height: 38%; z-index: 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(0,240,255,.55) 0 2px, transparent 2px 6cqw),
+      repeating-linear-gradient(0deg, rgba(0,240,255,.55) 0 2px, transparent 2px 3cqw);
+    transform: perspective(30cqw) rotateX(62deg); transform-origin: bottom; opacity: .55;
+    -webkit-mask-image: linear-gradient(transparent, #000 60%); mask-image: linear-gradient(transparent, #000 60%); }
+  .b .sun { position: absolute; left: 50%; top: 30%; width: 34cqw; height: 34cqw; transform: translateX(-50%); border-radius: 50%; z-index: 0;
+    background: linear-gradient(#fff35c, #ff9d00 45%, #ff2a6a 75%);
+    -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 2.2cqw, transparent 2.2cqw 3cqw); mask-image: repeating-linear-gradient(0deg, #000 0 2.2cqw, transparent 2.2cqw 3cqw); opacity: .85; }
+  .b > *:not(.floor):not(.sun) { position: relative; z-index: 1; }
+  .b .top { text-align: center; }
+  .b .top .pre { font-family: "Press Start 2P"; font-size: 1.1cqw; letter-spacing: .3em; color: #00f0ff; text-shadow: 0 0 1cqw #00f0ff; }
+  .b .top h3 { margin: .8cqw 0 0; font-family: "Bungee Shade"; font-size: 9cqw; line-height: .9; font-weight: 400;
+    background: linear-gradient(#ffffff 0%, #ffe9ff 40%, #ff5bd8 52%, #6a1bff 100%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 .4cqw 0 #120424) drop-shadow(0 0 1.6cqw #ff2bd6aa); }
+  .b .games { display: flex; justify-content: center; align-items: flex-end; gap: 2.4cqw; padding-top: 2cqw; }
+  .b .game { width: 22cqw; background: #0d0620; border-radius: .8cqw; padding: .8cqw; transform: translateY(0); box-shadow: 0 0 0 .3cqw var(--p), 0 1.2cqw 2.4cqw #000a; }
+  .b .game .mq { font-family: "Bungee"; font-size: 1.55cqw; text-align: center; padding: .6cqw .4cqw; border-radius: .4cqw; background: linear-gradient(var(--s), var(--p)); color: #160c22; line-height: 1.05; }
+  .b .game .scr { margin-top: .8cqw; border-radius: .4cqw; overflow: hidden; border: .3cqw solid #000; }
+  .b .game .meta { display: flex; justify-content: space-between; margin-top: .7cqw; font-family: "Press Start 2P"; font-size: .85cqw; color: #cfc4ff; }
+  .b .game.sel { transform: translateY(-1.6cqw) scale(1.06); box-shadow: 0 0 0 .35cqw #fff35c, 0 0 3cqw .4cqw #fff35caa, 0 1.2cqw 2.4cqw #000a; }
+  .b .game.soon { opacity: .55; }
+  .b .game.soon .scr { aspect-ratio: 32/24; display: grid; place-items: center; background: #1a1030; font-family: "Press Start 2P"; font-size: .9cqw; color: #9aa3b5; }
+  .b .bottom { display: flex; justify-content: space-between; align-items: center; font-family: "Press Start 2P"; font-size: 1cqw; }
+  .b .bottom .press { color: #fff35c; animation: blink 1.2s steps(2) infinite; text-shadow: 0 0 1cqw #fff35c; }
+  .b .bottom .blurb { max-width: 46cqw; text-align: center; font-family: "Space Mono"; font-size: 1.2cqw; color: #f0e6ff; }
+
+  /* ---------- C: Tournament flyer ---------- */
+  .c { background: #ffd23b; color: #160c22; font-family: "Space Mono"; display: grid; grid-template-columns: 1.05fr 1fr; }
+  .c .left { position: relative; padding: 2.4cqw; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;
+    background: radial-gradient(circle, #160c2222 22%, transparent 24%) 0 0 / 1.1cqw 1.1cqw, #ffd23b; }
+  .c .left .burst { position: absolute; right: -14cqw; top: -10cqw; width: 46cqw; height: 46cqw; border-radius: 50%;
+    background: repeating-conic-gradient(#ff3d3d 0 7.5deg, #ff7a2f 7.5deg 15deg); z-index: 0; }
+  .c .left > * { position: relative; z-index: 1; }
+  .c .left .kicker { font-family: "Press Start 2P"; font-size: 1.1cqw; background: #160c22; color: #ffd23b; align-self: flex-start; padding: .6cqw .9cqw; transform: rotate(-2deg); }
+  .c .left h3 { margin: 0; font-family: "Archivo Black"; font-size: 10.5cqw; line-height: .84; text-transform: uppercase; letter-spacing: -.02em;
+    color: #fff; -webkit-text-stroke: .35cqw #160c22; paint-order: stroke fill; text-shadow: .7cqw .7cqw 0 #160c22; }
+  .c .left .info { font-size: 1.2cqw; line-height: 1.5; max-width: 34cqw; }
+  .c .left .info b { background: #160c22; color: #fff; padding: 0 .4cqw; }
+  .c .right { background: #160c22; color: #fff; padding: 2cqw; display: grid; grid-template-rows: auto 1fr; gap: 1.2cqw; }
+  .c .right .hd { display: flex; justify-content: space-between; font-family: "Press Start 2P"; font-size: 1cqw; color: #ffd23b; }
+  .c .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4cqw; align-content: start; }
+  .c .card { background: #fff; color: #160c22; border-radius: .6cqw; padding: .7cqw; transform: rotate(var(--r)); box-shadow: .6cqw .6cqw 0 var(--p); }
+  .c .card .scr { border: .25cqw solid #160c22; }
+  .c .card h4 { margin: .6cqw 0 .2cqw; font-family: "Archivo Black"; font-size: 1.6cqw; line-height: 1; }
+  .c .card .pl { font-family: "Press Start 2P"; font-size: .8cqw; display: inline-block; background: var(--p); color: #fff; padding: .3cqw .5cqw; }
+  .c .card.sel { outline: .4cqw solid #ffd23b; outline-offset: .4cqw; }
+  .c .card.soon { background: #2b2140; color: #9aa3b5; box-shadow: none; display: grid; place-items: center; min-height: 14cqw; font-family: "Press Start 2P"; font-size: .9cqw; }
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>Three poster directions for The Flynn Arcade</h1>
+  <p>Each one fills the whole window and stretches to any screen shape. The yellow highlight shows the selected game (arrow keys or the mouse move it, and Enter or a click starts it). There's a "coming soon" slot so you can see how more games fit. Click the one closest to what you want.</p>
+</div>
+
+<div class="choice" data-choice="a" onclick="toggleSelect(this)">
+  <div class="choice-head"><span class="tag">A</span><h2>Gig poster</h2><p>Closest to the Nifty Portal: giant type, ticker strips, panel boxes, grain</p></div>
+  <div class="poster a">
+    <div class="ticker"><span>INSERT COIN <b>✦</b> 2 GAMES ON THE FLOOR <b>✦</b> PRESS START <b>✦</b> FREE PLAY <b>✦</b> THE FLYNN ARCADE <b>✦</b> INSERT COIN <b>✦</b> 2 GAMES ON THE FLOOR <b>✦</b> PRESS START <b>✦</b> FREE PLAY <b>✦</b> THE FLYNN ARCADE <b>✦</b> </span></div>
+    <div class="logo"><h3>Flynn<br>Arcade</h3><div class="stamp"><span>EST. 2026</span><strong>THE<br>FLYNN<br>ARCADE</strong><span>CREDITS ∞</span></div></div>
+    <div class="bar"><div>PLAYER SELECT</div><div class="blink">▮</div><div>SUPER FLYNN BROS — help Colin and Ryan get to school, practice, and back home!</div><div>1–2P CO-OP</div><div class="clock">00:00:00</div></div>
+    <div class="games">
+      <div class="game sel"><div class="hd"><span>GAME 01</span><span>1–2P</span></div><div class="pic"><canvas class="art" data-g="0"></canvas></div><div class="ft"><h4>SUPER FLYNN BROS</h4><p>Dodge dogs, grab donuts</p></div></div>
+      <div class="game"><div class="hd"><span>GAME 02</span><span>1–2P VS</span></div><div class="pic"><canvas class="art" data-g="1"></canvas></div><div class="ft"><h4>FLYNN FAMILY FIGHTERS</h4><p>Pick a Flynn, throw fireballs</p></div></div>
+      <div class="game soon"><div class="hd"><span>GAME 03</span><span>??</span></div><div class="pic">COMING SOON</div><div class="ft"><h4>???</h4><p>Your game here</p></div></div>
+    </div>
+    <div class="ticker rev"><span>← → CHOOSE <b>◆</b> ENTER TO PLAY <b>◆</b> M FOR SOUND <b>◆</b> ← → CHOOSE <b>◆</b> ENTER TO PLAY <b>◆</b> M FOR SOUND <b>◆</b> ← → CHOOSE <b>◆</b> ENTER TO PLAY <b>◆</b> M FOR SOUND <b>◆</b> ← → CHOOSE <b>◆</b> ENTER TO PLAY <b>◆</b> M FOR SOUND <b>◆</b> </span></div>
+  </div>
+  <p class="note">Calm and graphic, like a concert poster. The color comes from the game pictures, and the selected game lights up yellow.</p>
+</div>
+
+<div class="choice" data-choice="b" onclick="toggleSelect(this)">
+  <div class="choice-head"><span class="tag">B</span><h2>Neon night</h2><p>The same poster idea in loud '90s arcade colors: chrome logo, sunset, grid floor</p></div>
+  <div class="poster b">
+    <div class="sun"></div><div class="floor"></div>
+    <div class="top"><div class="pre">★ NOW PLAYING ★</div><h3>FLYNN ARCADE</h3></div>
+    <div class="games">
+      <div class="game sel" style="--p:#5ab0f0;--s:#f6d860"><div class="mq">SUPER FLYNN BROS</div><div class="scr"><canvas class="art" data-g="0"></canvas></div><div class="meta"><span>1-2P</span><span>CO-OP</span></div></div>
+      <div class="game" style="--p:#ff4040;--s:#ffe14a"><div class="mq">FLYNN FAMILY FIGHTERS</div><div class="scr"><canvas class="art" data-g="1"></canvas></div><div class="meta"><span>1-2P</span><span>VERSUS</span></div></div>
+      <div class="game soon" style="--p:#9aa3b5;--s:#d6dbe6"><div class="mq">COMING SOON</div><div class="scr">???</div><div class="meta"><span>--</span><span>--</span></div></div>
+    </div>
+    <div class="bottom"><span>CREDIT 99</span><span class="blurb">Help Colin and Ryan get to school, practice, and back home! Dodge dogs, grab donuts!</span><span class="press">PRESS START</span></div>
+  </div>
+  <p class="note">The most "arcade" of the three, like the front of a cabinet at night. The current arcade's sunburst and floor become a neon horizon.</p>
+</div>
+
+<div class="choice" data-choice="c" onclick="toggleSelect(this)">
+  <div class="choice-head"><span class="tag">C</span><h2>Tournament flyer</h2><p>A bright, loud flyer from a '90s game shop: halftone dots, a starburst, trading-card games</p></div>
+  <div class="poster c">
+    <div class="left">
+      <div class="burst"></div>
+      <div class="kicker">FREE PLAY ALL DAY!</div>
+      <h3>The<br>Flynn<br>Arcade</h3>
+      <div class="info"><b>NOW PLAYING:</b> Super Flynn Bros. Help Colin and Ryan get to school, practice, and back home! <br>← → to choose, ENTER to play.</div>
+    </div>
+    <div class="right">
+      <div class="hd"><span>SELECT A GAME</span><span>2 / 2</span></div>
+      <div class="cards">
+        <div class="card sel" style="--r:-2deg;--p:#5ab0f0"><div class="scr"><canvas class="art" data-g="0"></canvas></div><h4>SUPER FLYNN BROS</h4><span class="pl">1-2P CO-OP</span></div>
+        <div class="card" style="--r:1.5deg;--p:#ff4040"><div class="scr"><canvas class="art" data-g="1"></canvas></div><h4>FLYNN FAMILY FIGHTERS</h4><span class="pl">1-2P VS</span></div>
+        <div class="card soon" style="--r:1deg">COMING SOON</div>
+      </div>
+    </div>
+  </div>
+  <p class="note">Sunny and kid-friendly, with the most color and the least "night arcade". Each game is a trading card.</p>
+</div>
+
+<script>
+const GAMES = [{"id":"super-flynn-bros","title":"SUPER FLYNN BROS","blurb":"Help Colin and Ryan get to school, practice, and back home! Dodge dogs, grab donuts!","players":{"min":1,"max":2,"coop":true},"colors":{"primary":"#5ab0f0","secondary":"#f6d860"},"devPort":8001,"order":1,"screenArt":{"colors":{"S":"#6cc4ff","Y":"#fff4b0","G":"#c9c3b5","D":"#8a5a32","H":"#f6d860","h":"#7a4a2a","F":"#f3c294","K":"#1d1d2b","B":"#3d7be0","g":"#3fae5a","P":"#3a4466","W":"#f2f2f2"},"art":["SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS","SSSSSSSSSSSSSSSSSSSSSSSSSSYYSSSS","SSSSSSSSSSSSSSSSSSSSSSSSSYYYYSSS","SSSSSSSSSSSSSSSSSSSSSSSSYYYYYYSS","SSSSSSSSSSSSSSSSSSSSSSSSSYYYYSSS","SSSSSSSSSSSSSSSSSSSSSSSSSSYYSSSS","SSSSSSSSSSHHHSSSSSSSSSSSSSSSSSSS","SSSSSSSSSHHHHHSSSSSSSSSSSSSSSSSS","SSSSSSSSSHFFFHSSSSSSSSSSSSSSSSSS","SSSSSSSSSFKFKFSSSSSSSSSSSSSSSSSS","SSSSSSSSSFFFFFSSSSShhhSSSSSSSSSS","SSSSSSSSSSFFFSSSSShhhhhSSSSSSSSS","SSSSSSSSSBBBBBSSSShFFFhSSSSSSSSS","SSSSSSSSBBBBBBBSSSFKFKFSSSSSSSSS","SSSSSSSSFBBBBBFSSSFFFFFSSSSSSSSS","SSSSSSSSFBBBBBFSSSgggggSSSSSSSSS","SSSSSSSSSBBBBBSSSFgggggFSSSSSSSS","SSSSSSSSSPPSPPSSSSgggggSSSSSSSSS","SSSSSSSSSPPSPPSSSSPPSPPSSSSSSSSS","SSSSSSSSSPPSPPSSSSFFSFFSSSSSSSSS","SSSSSSSSSWWSWWSSSSWWSWWSSSSSSSSS","GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG","DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD","DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"]}},{"id":"flynn-family-fighters","title":"FLYNN FAMILY FIGHTERS","blurb":"Street-fighter style showdowns! Pick a Flynn, throw fireballs, and win the tournament!","players":{"min":1,"max":2,"coop":false},"colors":{"primary":"#ff4040","secondary":"#ffe14a"},"devPort":8002,"order":2,"screenArt":{"colors":{"S":"#4a2378","s":"#ff8c52","Y":"#ffd27a","R":"#c4553a","L":"#fff2e0","H":"#f7d35c","h":"#7a4a2a","F":"#f1c08f","K":"#1d1d2b","B":"#2f6fd6","g":"#3fae5a","P":"#3a4466","W":"#f2f2f2","O":"#ff7ad9"},"art":["SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS","SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS","SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS","SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS","ssssssssssssssssssssssssssssssss","ssssssssssssssYYYYssssssssssssss","ssssssssssssYYYYYYYYssssssssssss","ssssssssssssYYYYYYYYssssssssssss","ssssssssssssssYYYYssssssssssssss","ssssssssssssssssssssssssssssssss","sssssHHHHssssssssssssssshhhhssss","sssssHHHHHsssssssssssshhhhhhssss","sssssFFFFFssssssssssssFFFFFhssss","sssssFKFFFsssssssssssFFFFKFsssss","ssssWWWWWWsssssssssssssFFFFFssss","sssssBBBBBFFFsssOOsssssggggFFsss","sssssBBBBBBFFOOOOOOsssgggggsssss","sssssBBBBBssssOOsssssFgggggsssss","ssssssBBBBsssssssssssssPPPPsssss","ssssssBBBBssssssssssssPPssPPssss","ssssssWWsWWssssssssssssWWsWWssss","RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR","RLLLLLLLRRRRRRRRRLLLLLLLRRRRRRRR","RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR"]}}];
+document.querySelectorAll("canvas.art").forEach((c) => {
+  const g = GAMES[+c.dataset.g].screenArt;
+  c.width = 32; c.height = 24;
+  const x = c.getContext("2d");
+  g.art.forEach((row, y) => [...row].forEach((ch, i) => { x.fillStyle = g.colors[ch] || "#000"; x.fillRect(i, y, 1, 1); }));
+});
+const clk = document.querySelector(".a .clock");
+setInterval(() => { clk.textContent = new Date().toTimeString().slice(0, 8); }, 1000);
+</script>
+</body>
+</html>
