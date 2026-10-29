@@ -46,8 +46,9 @@ You'll need a grown-up for this part the first time.
 ```bash
 docker compose up --build
 ```
-Then open **http://localhost:8000**: that's the arcade! 🕹️ Walk along the
-cabinets with ◀ ▶, and press Start (Enter or Space) to play. Every game has a
+Then open **http://localhost:8000**: that's the arcade! 🕹️ Pick a game off
+the poster with the arrow keys (or the mouse), and press Start (Enter or Space)
+to play. Every game has a
 "BACK TO ARCADE" option to come back.
 
 **The tinkering way (live editing):**

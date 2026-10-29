@@ -260,7 +260,9 @@ At minimum, include:
    `README.md`. Keep the root README's fun, kid-friendly tone.
 8. Sanity-check tweakability: change a setting and swap the hero image, and
    confirm both work with hot reload.
-9. Join the arcade (§10): add `<game-name>/arcade.ts` (and `src/vite-env.d.ts`
+9. Join the arcade (§10): add `<game-name>/arcade.ts` with a `tagline` and a
+   `capture` recipe, record its pictures with `npm run capture -w arcade --
+   <game-name>` (and add `src/vite-env.d.ts`
    so `import.meta.env.DEV` type-checks), copy the `super-flynn-bros` pair of
    `location` blocks in `arcade/nginx.conf` with the new name in all four
    places, add the game to the `arcade` service's `depends_on`, and add a
@@ -271,13 +273,26 @@ At minimum, include:
 ## 10. The Arcade (`arcade/`)
 
 The arcade is the front door: kids open `http://localhost:8000` and pick a
-game cabinet. It's a Vite + Phaser app like the games.
+game off a big poster. It's a Vite + TypeScript page built with plain HTML and
+CSS (no Phaser): a web page is what stretches to fit any screen. The games
+themselves stay Phaser.
 
 - **Joining:** each game exports `arcadeInfo: GameInfo` (from
   `@web-games/arcade`) in `<game-name>/arcade.ts`: `id` (= folder name),
-  `title`, `blurb`, `players`, cabinet `colors`, `devPort`, optional `order`,
-  and a `screenArt` text picture (up to 32 × 24). The arcade finds every
-  `*/arcade.ts` automatically at build time. Never edit arcade code to add a game.
+  `title`, `blurb`, optional `tagline` (up to 40 letters, under the title),
+  `players`, `devPort`, optional `order`, a `screenArt` text picture (up to
+  32 × 24, shown when there's no screenshot), and an optional `capture` recipe.
+  The arcade finds every `*/arcade.ts` automatically at build time. Never edit
+  arcade code to add a game. (Old files with cabinet `colors` still load; the
+  field is ignored.)
+- **Pictures:** each game may have `<game-name>/arcade-media/screenshot.png`
+  and `clip.mp4` (silent, 5–8 s, 960 wide, under ~300 KB / ~1.5 MB). Make them
+  with `npm run capture -w arcade -- <game-name>`, which plays the game in a
+  hidden browser using the `capture` recipe (needs `ffmpeg` and
+  `npx playwright install chromium`), and commit them. Without them the
+  panel shows the `screenArt`.
+- **Look:** the poster stays monochrome (`arcade/src/settings.ts` colors) so
+  the games' pictures are the only color. Don't add per-game colors to it.
 - **Routing:** in Docker the arcade serves `/` and its nginx forwards
   `/<game-name>/` to the game's container. In dev the arcade links to the
   game's own dev server (`devPort`). Games are built with `base: "./"` so they
@@ -290,6 +305,12 @@ game cabinet. It's a Vite + Phaser app like the games.
 ## Amendment Log
 
 Record every change to these guidelines (newest first).
+
+- 2026-10-29 — §10, §9: the arcade is now a full-window HTML/CSS poster (no
+  Phaser). `GameInfo` drops cabinet `colors` and gains `tagline` and `capture`;
+  games get optional `arcade-media/screenshot.png` + `clip.mp4`, made with
+  `npm run capture -w arcade`. (The fixed 320 × 176 canvas left black bars on
+  most screens.)
 
 - 2026-10-28 — §7: added "Tests on kid files": tests may only check what stays
   true after reasonable kid edits; engine tests use fixtures; the one exception
