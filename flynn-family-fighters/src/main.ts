@@ -3,6 +3,7 @@ import { AfterMatchScene } from "./scenes/AfterMatchScene";
 import { BootScene, type BootRequest } from "./scenes/BootScene";
 import { ChampScene } from "./scenes/ChampScene";
 import { FightScene } from "./scenes/FightScene";
+import { HelpScene } from "./scenes/HelpScene";
 import { SelectScene } from "./scenes/SelectScene";
 import { TitleScene } from "./scenes/TitleScene";
 import { VersusScene } from "./scenes/VersusScene";
@@ -34,10 +35,10 @@ function readRequest(): BootRequest {
 }
 
 const request = readRequest();
-// Boot runs first. The after-match menu comes after the fight so it draws on top.
+// Boot runs first. The after-match menu and help come after the fight so they draw on top.
 const scenes = params.has("viewer")
   ? [ViewerScene]
-  : [BootScene, TitleScene, SelectScene, VersusScene, FightScene, AfterMatchScene, ChampScene];
+  : [BootScene, TitleScene, SelectScene, VersusScene, FightScene, AfterMatchScene, HelpScene, ChampScene];
 
 new Phaser.Game({
   type: Phaser.WEBGL,

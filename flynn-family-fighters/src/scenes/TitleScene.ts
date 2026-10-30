@@ -5,9 +5,10 @@ import { label, Menu, useMenuControls } from "../render/menu";
 import { drawStage, type StageView } from "../render/stageView";
 import { stageById } from "../stages";
 import { getServices } from "./BootScene";
+import type { HelpData } from "./HelpScene";
 import type { SelectData } from "./SelectScene";
 
-const OPTIONS = ["1P ARCADE", "2P VERSUS", "QUIT TO ARCADE"] as const;
+const OPTIONS = ["1P ARCADE", "2P VERSUS", "CONTROLS", "QUIT TO ARCADE"] as const;
 
 /** The title: the big logo over the track, and the main menu. */
 export class TitleScene extends Phaser.Scene {
@@ -35,8 +36,8 @@ export class TitleScene extends Phaser.Scene {
 
     // A dark strip behind the menu so it reads over the busy stage.
     this.add.rectangle(480, 420, 560, 200, 0x160c22).setDepth(9);
-    this.menu = new Menu(this, OPTIONS, 480, 340, 56);
-    label(this, "PUNCH OR START TO PICK", 480, 496, { size: 16, align: "center", color: "#fff6c8" }).setDepth(10);
+    this.menu = new Menu(this, OPTIONS, 480, 332, 42);
+    label(this, "PUNCH OR START TO PICK", 480, 500, { size: 16, align: "center", color: "#fff6c8" }).setDepth(10);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.stageView.destroy();
@@ -55,6 +56,7 @@ export class TitleScene extends Phaser.Scene {
     const choice = OPTIONS[picked];
     if (choice === "1P ARCADE") this.scene.start("select", { mode: "arcade" } satisfies SelectData);
     else if (choice === "2P VERSUS") this.scene.start("select", { mode: "versus" } satisfies SelectData);
+    else if (choice === "CONTROLS") this.scene.start("help", { back: "title" } satisfies HelpData);
     else window.location.assign(arcadeUrl("flynn-family-fighters", { dev: import.meta.env.DEV }));
   }
 }

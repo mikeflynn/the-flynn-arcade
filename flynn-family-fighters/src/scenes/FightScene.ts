@@ -17,6 +17,7 @@ import { drawStage, type StageView } from "../render/stageView";
 import { settings } from "../settings";
 import type { StageDef } from "../stages";
 import { getServices } from "./BootScene";
+import type { HelpData } from "./HelpScene";
 
 export interface FightData {
   p1: Fighter;
@@ -33,7 +34,7 @@ export interface FightData {
 /** After the match is decided, wait this many steps before moving on. */
 const MATCH_END_STEPS = 180;
 const PLAYERS = [0, 1] as const;
-const PAUSE_OPTIONS = ["RESUME", "QUIT TO TITLE"] as const;
+const PAUSE_OPTIONS = ["RESUME", "CONTROLS", "QUIT TO TITLE"] as const;
 
 /** A heavy normal (HP or HK), a special or a throw: these shake the screen. */
 const isHeavy = (name = "") => !(name in NORMALS) || /H[PK]$/.test(name);
@@ -147,6 +148,12 @@ export class FightScene extends Phaser.Scene {
     if (picked === null) return;
     if (PAUSE_OPTIONS[picked] === "QUIT TO TITLE") {
       this.scene.start("title");
+      return;
+    }
+    if (PAUSE_OPTIONS[picked] === "CONTROLS") {
+      // The help screen goes on top; the fight (and its pause menu) waits underneath.
+      this.scene.launch("help", { back: "fight" } satisfies HelpData);
+      this.scene.pause();
       return;
     }
     this.closePause();

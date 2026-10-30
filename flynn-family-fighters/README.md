@@ -29,6 +29,7 @@ If only **one** fighter is in the game, arcade mode is a mirror match: you fight
 
 - **Gamepad:** D-pad or left stick moves. X, Y and RB are the punches (light, medium, heavy). A, B and RT are the kicks. Start picks, and pauses a fight.
 - **M** turns the sound on and off.
+- **CONTROLS** (on the title menu, and in the pause menu during a fight) shows all the keys and buttons.
 - **QUIT TO ARCADE** (title menu) takes you back to The Flynn Arcade.
 - Two players on one keyboard? Some keyboards can't feel lots of keys at once ("key ghosting"). Gamepads work best.
 
@@ -65,7 +66,7 @@ Try the **fighter lineup** to see everyone up close: open <http://localhost:8002
 A peek behind the curtain at what makes the game tick.
 
 **The scenes.** The game is a chain of screens, each one a file in [`src/scenes/`](src/scenes/):
-[`TitleScene`](src/scenes/TitleScene.ts) (menu) → [`SelectScene`](src/scenes/SelectScene.ts) (pick fighters) → [`VersusScene`](src/scenes/VersusScene.ts) (the "VS" splash) → [`FightScene`](src/scenes/FightScene.ts) (the fight) → [`ChampScene`](src/scenes/ChampScene.ts) (the winner!). [`AfterMatchScene`](src/scenes/AfterMatchScene.ts) asks what to do next. [`BootScene`](src/scenes/BootScene.ts) loads and draws everything before the title shows up, and [`ViewerScene`](src/scenes/ViewerScene.ts) is the fighter lineup.
+[`TitleScene`](src/scenes/TitleScene.ts) (menu) → [`SelectScene`](src/scenes/SelectScene.ts) (pick fighters) → [`VersusScene`](src/scenes/VersusScene.ts) (the "VS" splash) → [`FightScene`](src/scenes/FightScene.ts) (the fight) → [`ChampScene`](src/scenes/ChampScene.ts) (the winner!). [`AfterMatchScene`](src/scenes/AfterMatchScene.ts) asks what to do next, and [`HelpScene`](src/scenes/HelpScene.ts) is the CONTROLS screen. [`BootScene`](src/scenes/BootScene.ts) loads and draws everything before the title shows up, and [`ViewerScene`](src/scenes/ViewerScene.ts) is the fighter lineup.
 
 **The rig: fighters are paper dolls.** Nobody drew these fighters frame by frame. Each one is a set of *shapes* (head, chest, upper arm, forearm, thigh, and so on) joined at joints, like a paper doll with pins. The shapes are drawn from a **`Look`**: hair, skin, colors, build and so on from the character file. An *animation* is just a list of poses, and a pose is one angle for each joint. The game blends from one pose to the next, then bakes every frame into a sheet of little pictures at start-up. That code lives in the shared [`lib/rig`](../lib/rig/) library. The game's poses and animations are in [`src/animations.ts`](src/animations.ts).
 
@@ -118,7 +119,7 @@ All in [`src/settings.ts`](src/settings.ts), in the `mySettings` block:
 | `showHitboxes` | Draw the attack boxes | `true` to learn how hits work |
 | `animationFps` | Pictures per second for fighters | 15 (chunky retro), 20, or 30 (smooth). Other numbers snap to the closest. |
 
-Want to change the controls? Edit [`src/controls.ts`](src/controls.ts). The names look like `"KeyA"` or `"ArrowLeft"`. ⚠️ Player 1 and player 2 must use *different* keys (only `start` and `mute` may share). If you give both players the same key, `npm test` will fail and tell you which one.
+Want to change the controls? Edit [`src/controls.ts`](src/controls.ts). The names look like `"KeyA"` or `"ArrowLeft"`. ⚠️ Player 1 and player 2 must use *different* keys (only `start` and `mute` may share). If you give both players the same key, `npm test` will fail and tell you which one. The CONTROLS screen reads this file, so your new keys show up there by themselves ([`src/help.ts`](src/help.ts) turns `"KeyA"` into `A`).
 
 ### 3. Make yourself a fighter
 
