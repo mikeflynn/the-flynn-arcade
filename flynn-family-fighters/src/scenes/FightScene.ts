@@ -118,7 +118,11 @@ export class FightScene extends Phaser.Scene {
         this.openPause();
         return;
       }
-      for (let n = 0; n < steps; n++) this.tick();
+      for (let n = 0; n < steps; n++) {
+        // The match just ended and the next screen took over: this fight is
+        // gone, so there's nothing left to step or draw.
+        if (this.tick()) return;
+      }
     }
     this.draw(time);
   }
@@ -156,15 +160,19 @@ export class FightScene extends Phaser.Scene {
     this.pause = null;
   }
 
-  /** One game step: inputs in, events out. */
-  private tick(): void {
+  /** One game step: inputs in, events out. True when the match is over and onDone has moved on. */
+  private tick(): boolean {
     const { input } = getServices();
     const s = this.match;
     const inputs = PLAYERS.map((i) => this.brains[i]?.next(s) ?? inputFrameFrom(input, i + 1)) as [number, number];
     for (const e of stepMatch(s, inputs)) this.handle(e);
     this.effects.step();
     this.hud.step();
-    if (this.endSteps >= 0 && ++this.endSteps === MATCH_END_STEPS) this.fight.onDone(matchWinner(s) ?? "draw");
+    if (this.endSteps >= 0 && ++this.endSteps === MATCH_END_STEPS) {
+      this.fight.onDone(matchWinner(s) ?? "draw");
+      return true;
+    }
+    return false;
   }
 
   /** Sounds, sparks and banners for the things that happened this step. */
